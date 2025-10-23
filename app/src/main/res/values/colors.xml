@@ -4,4 +4,20 @@
     <color name="white">#FFFFFFFF</color>
     <color name="grey">#FF909090</color>">
     <color name="cream">#B2EDE7CD</color>"
+
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+
+    <color name="bg">#111317</color>
+    <color name="fg">#FFFFFF</color>
+
+    <color name="tile_border">#2C2F36</color>
+    <color name="neutral">#1D232A</color>
+    <color name="correct">#538D4E</color>   <!-- green -->
+    <color name="present">#B59F3B</color>   <!-- yellow -->
+    <color name="absent">#3A3A3C</color>    <!-- gray -->
+
 </resources>

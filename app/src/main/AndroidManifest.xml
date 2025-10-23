@@ -21,18 +21,38 @@
         <activity
             android:name=".LoginActivity"
             android:exported="true"
-            android:theme="@style/Theme.TouchalyticsApp">
+            android:theme="@style/Theme.TouchalyticsApp"/>
+        <!-- HUB is the ONLY launcher -->
+        <activity
+            android:name=".MainMenuActivity"
+            android:exported="true"
+            android:label="App Hub">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Wordle (no launcher filter) -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:parentActivityName=".LoginActivity"
-            android:theme="@style/Theme.TouchalyticsApp"/>
+            android:name=".WordleActivity"
+            android:label="Wordle"
+            android:parentActivityName=".MainMenuActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:launchMode="singleTop" />
+
+        <!-- News / Media -->
+        <activity
+            android:name=".NewsMediaActivity"
+            android:label="News / Media"
+            android:parentActivityName=".MainMenuActivity" />
+
+        <!-- Fruit Ninja -->
+        <activity
+            android:name=".FruitNinjaActivity"
+            android:label="Fruit Ninja"
+            android:parentActivityName=".MainMenuActivity" />
+
     </application>
 
 </manifest>
