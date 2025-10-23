@@ -9,9 +9,11 @@ public class Features {
     private float strokeDuration;
     private float midStrokeArea;
     private float midStrokePressure;
+    private float touchArea; // average pixel contact area (px^2)
     private float directionEndToEnd;
     private float averageDirection;
     private float averageVelocity;
+    private float maxVelocity; // peak instantaneous velocity (pixels/ms)
     private float pairwiseVelocityPercentile;
     private float startX;
     private float stopX;
@@ -88,6 +90,22 @@ public class Features {
     }
 
     /**
+     * Gets the average touch contact area in pixels^2.
+     * @return The average touch contact area (px^2).
+     */
+    public float getTouchArea() {
+        return touchArea;
+    }
+
+    /**
+     * Sets the average touch contact area in pixels^2.
+     * @param touchArea The average touch contact area (px^2).
+     */
+    public void setTouchArea(float touchArea) {
+        this.touchArea = touchArea;
+    }
+
+    /**
      * Gets the end-to-end direction of the stroke.
      * @return The end-to-end direction.
      */
@@ -133,6 +151,22 @@ public class Features {
      */
     public void setAverageVelocity(float averageVelocity) {
         this.averageVelocity = averageVelocity;
+    }
+
+    /**
+     * Gets the peak instantaneous velocity of the stroke.
+     * @return The maximum velocity (pixels/ms).
+     */
+    public float getMaxVelocity() {
+        return maxVelocity;
+    }
+
+    /**
+     * Sets the peak instantaneous velocity of the stroke.
+     * @param maxVelocity The maximum velocity (pixels/ms).
+     */
+    public void setMaxVelocity(float maxVelocity) {
+        this.maxVelocity = maxVelocity;
     }
 
     /**

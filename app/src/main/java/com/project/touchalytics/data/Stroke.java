@@ -68,7 +68,9 @@ public class Stroke {
                 event.getY(),
                 event.getEventTime(),
                 event.getPressure(),
-                event.getSize()
+                event.getSize(),
+                event.getTouchMajor(),
+                event.getTouchMinor()
         );
         points.add(point);
     }
@@ -98,15 +100,15 @@ public class Stroke {
     }
 
     /**
-    * Adds a new {@link TouchPoint} to the stroke with specified feature values.
-    * @param x x coordinate of the point.
-    * @param y y coordinate of the point.
-    * @param timestamp timestamp of the point.
-    * @param pressure pressure of the point.
-    * @param size size of the point.
-    * */
+     * Adds a new {@link TouchPoint} to the stroke with specified feature values.
+     * @param x x coordinate of the point.
+     * @param y y coordinate of the point.
+     * @param timestamp timestamp of the point.
+     * @param pressure pressure of the point.
+     * @param size size of the point.
+     */
     public void addPointWithFeatures(float x, float y, long timestamp, float pressure, float size) {
-        TouchPoint point = new TouchPoint(x, y, timestamp, pressure, size);
+        TouchPoint point = new TouchPoint(x, y, timestamp, pressure, size, 0f, 0f);
         points.add(point);
     }
 
@@ -133,6 +135,33 @@ public class Stroke {
         }
 
         return (maxX - minX) * (maxY - minY);  // Bounding box area
+    }
+
+    /**
+     * Calculates the average pixel area of touch contact across the stroke.
+     * Uses the contact ellipse from MotionEvent (touchMajor/touchMinor) in pixels:
+     * area = π * (touchMajor / 2) * (touchMinor / 2).
+     *
+     * @return The average touch contact area in pixels^2. Returns 0 if no usable points exist.
+     */
+    public float calculateAverageTouchArea() {
+
+        if (points.isEmpty()) return 0;
+
+        double totalArea = 0;
+        int validCount = 0;
+
+        for (TouchPoint point : points) {
+            if (point.touchMajor > 0 && point.touchMinor > 0) {
+                double area = Math.PI * (point.touchMajor / 2.0) * (point.touchMinor / 2.0);
+                totalArea += area;
+                validCount++;
+            }
+        }
+
+        if (validCount == 0) return 0;
+
+        return (float) (totalArea / validCount);
     }
 
     /**
@@ -279,6 +308,33 @@ public class Stroke {
         long totalTime = points.get(points.size() - 1).timestamp - points.get(0).timestamp;
         if (totalTime == 0) return 0; // Avoid division by zero
         return totalDistance / totalTime;
+    }
+
+    /**
+     * Calculates the maximum instantaneous velocity between consecutive points in the stroke.
+     * Velocity is computed as distance / timeDelta for each consecutive pair (pixels per millisecond).
+     * @return The peak velocity during the stroke. Returns 0 if there are fewer than 2 points or all time deltas are non-positive.
+     */
+    public float calculateMaxVelocity() {
+        if (points.size() < 2) {
+            return 0;
+        }
+
+        float maxVelocity = 0;
+
+        for (int i = 1; i < points.size(); i++) {
+            float distance = calculateDistance(points.get(i - 1), points.get(i));
+            float timeDelta = points.get(i).timestamp - points.get(i - 1).timestamp;
+
+            if (timeDelta > 0) {
+                float velocity = distance / timeDelta; // pixels/ms
+                if (velocity > maxVelocity) {
+                    maxVelocity = velocity;
+                }
+            }
+        }
+
+        return maxVelocity;
     }
 
 }

@@ -245,6 +245,8 @@ public class MainActivity extends AppCompatActivity {
         features.setStopX(currentStroke.getStopX());
         features.setStartY(currentStroke.getStartY());
         features.setStopY(currentStroke.getStopY());
+        features.setTouchArea(currentStroke.calculateAverageTouchArea());
+        features.setMaxVelocity(currentStroke.calculateMaxVelocity());
 
         if (strokeCount < Constants.MIN_STROKE_COUNT) {
             Log.i(LOG_TAG, "Adding to Firebase");
