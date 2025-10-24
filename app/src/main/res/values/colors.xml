@@ -20,4 +20,9 @@
     <color name="present">#B59F3B</color>   <!-- yellow -->
     <color name="absent">#3A3A3C</color>    <!-- gray -->
 
+    <color name="hub_primary">#6C4ED9</color>           <!-- purple button / links -->
+    <color name="hub_surfaceLavender">#F5F2FF</color>   <!-- soft background -->
+    <color name="hub_textDark">#222222</color>
+    <color name="hub_textMedium">#4A4A4A</color>
+
 </resources>
