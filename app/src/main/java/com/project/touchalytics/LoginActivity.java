@@ -13,6 +13,8 @@ import com.google.android.material.snackbar.Snackbar;
  * Activity for user login.
  * Allows users to input their ID and proceed to the main application.
  */
+
+
 public class LoginActivity extends AppCompatActivity {
 
     Button loginButton;
@@ -56,6 +58,8 @@ public class LoginActivity extends AppCompatActivity {
             Snackbar.make(loginButton,"Invalid input. Please enter a valid number.", Snackbar.LENGTH_SHORT).show();
             return;
         }
+
+
 
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra(MainActivity.EXTRA_USER_ID, userID);
