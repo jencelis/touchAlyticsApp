@@ -27,6 +27,7 @@ import com.google.android.material.textfield.TextInputLayout;
  * Single-Activity auth flow:
  *  - Login screen (activity_login.xml)
  *  - Sign Up screen (activity_register.xml)
+ *  - Verify screen (activity_verify.xml)
  * We swap layouts inside this activity and wire their events here.
  */
 public class LoginActivity extends AppCompatActivity {
@@ -36,6 +37,9 @@ public class LoginActivity extends AppCompatActivity {
     private TextInputEditText emailInput, passwordInput;
     private MaterialButton primaryButton;
     private TextView forgotPasswordLink, createAccountLink, loginRedirectLink, privacyNote;
+
+    // Holds the email entered during registration (to use on Verify)
+    private String pendingEmail = null;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -124,7 +128,7 @@ public class LoginActivity extends AppCompatActivity {
         primaryButton = findViewById(R.id.registerButton);
         loginRedirectLink = findViewById(R.id.loginRedirectLink);
 
-        // Submit registration (dummy). After validation, return to Login screen.
+        // Submit registration (dummy). After validation, go to Verify screen.
         primaryButton.setOnClickListener(v -> {
             nameLayout.setError(null);
             emailLayout.setError(null);
@@ -159,13 +163,58 @@ public class LoginActivity extends AppCompatActivity {
 
             if (hasError) return;
 
-            // Simulate successful account creation
-            Snackbar.make(primaryButton, "Account created! Please log in.", Snackbar.LENGTH_LONG).show();
-            showLoginScreen(); // Return to login so the user can sign in
+            // Simulate account creation --> send (dummy) code and move to Verify
+            pendingEmail = email;
+            Snackbar.make(primaryButton, "Verification code sent to " + pendingEmail, Snackbar.LENGTH_LONG).show();
+            showVerifyScreen();
         });
 
         // Back to login
         loginRedirectLink.setOnClickListener(v -> showLoginScreen());
+    }
+
+    // -------------------- VERIFY --------------------
+
+    private void showVerifyScreen() {
+        setContentView(R.layout.activity_verify);
+
+        setSupportActionBar(findViewById(R.id.toolbar));
+        if (getSupportActionBar() != null) getSupportActionBar().setTitle("");
+
+        TextView verifySubtitle = findViewById(R.id.verifySubtitle);
+        if (pendingEmail != null) {
+            // Optional: show the email inline in the subtitle
+            verifySubtitle.setText(getString(R.string.verify_subtitle_with_email, pendingEmail));
+        }
+
+        TextInputLayout codeLayout = findViewById(R.id.codeLayout);
+        TextInputEditText codeInput = findViewById(R.id.codeInput);
+        primaryButton = findViewById(R.id.continueButton);
+
+        TextView resendCodeLink = findViewById(R.id.resendCodeLink);
+        TextView changeEmailLink = findViewById(R.id.changeEmailLink);
+
+        // Continue -> validate 6-digit code and proceed to MainMenu
+        primaryButton.setOnClickListener(v -> {
+            codeLayout.setError(null);
+            String code = codeInput.getText() == null ? "" : codeInput.getText().toString().trim();
+
+            if (code.length() != 6 || !code.matches("\\d{6}")) {
+                codeLayout.setError("Enter the 6-digit code");
+                return;
+            }
+
+            Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
+            startActivity(new Intent(this, MainMenuActivity.class));
+        });
+
+        resendCodeLink.setOnClickListener(v ->
+                Snackbar.make(v, "Resent code to " + (pendingEmail == null ? "your email" : pendingEmail), Snackbar.LENGTH_SHORT).show());
+
+        changeEmailLink.setOnClickListener(v -> {
+            Snackbar.make(v, "Change email", Snackbar.LENGTH_SHORT).show();
+            showRegisterScreen();
+        });
     }
 
     // -------------------- Helpers --------------------

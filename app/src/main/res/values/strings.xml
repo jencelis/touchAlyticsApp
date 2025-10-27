@@ -20,4 +20,13 @@
     <string name="register">Register</string>
     <string name="name">Name</string>
     <string name="already_have_account_login">Already have an account? Login</string>
+
+    <string name="verify">Verify</string>
+    <string name="verify_subtitle">Please check your email and enter the six-digit code</string>
+    <string name="verify_subtitle_with_email">We sent a six-digit code to %1$s. Enter it below.</string>
+    <string name="enter_code">Enter code</string>
+    <string name="resend_code">Resend code</string>
+    <string name="change_email">Change email</string>
+    <string name="continue_label">Continue</string>
+
 </resources>
