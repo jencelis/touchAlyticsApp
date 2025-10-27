@@ -247,6 +247,12 @@ public class MainActivity extends AppCompatActivity {
         features.setStopY(currentStroke.getStopY());
         features.setTouchArea(currentStroke.calculateAverageTouchArea());
         features.setMaxVelocity(currentStroke.calculateMaxVelocity());
+        features.setMinVelocity(currentStroke.calculateMinVelocity());
+        features.setAverageAcceleration(currentStroke.calculateAverageAcceleration());
+        features.setAverageDeceleration(currentStroke.calculateAverageDeceleration());
+        features.setTrajectoryLength(currentStroke.calculateTrajectoryLength());
+        features.setCurvature(currentStroke.calculateAveragePathDeviation());
+
 
         if (strokeCount < Constants.MIN_STROKE_COUNT) {
             Log.i(LOG_TAG, "Adding to Firebase");

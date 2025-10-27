@@ -14,11 +14,17 @@ public class Features {
     private float averageDirection;
     private float averageVelocity;
     private float maxVelocity; // peak instantaneous velocity (pixels/ms)
+    private float minVelocity; // minimum non-zero instantaneous velocity (pixels/ms)
     private float pairwiseVelocityPercentile;
     private float startX;
     private float stopX;
     private float startY;
     private float stopY;
+    private float averageAcceleration; // average positive acceleration (pixels/ms^2)
+    private float averageDeceleration; // average deceleration magnitude (pixels/ms^2)
+    private float trajectoryLength; // total distance traveled along stroke path (pixels)
+    private float curvature; // average deviation from straight line (pixels)
+
 
     /**
      * Default constructor for Features.
@@ -170,6 +176,22 @@ public class Features {
     }
 
     /**
+     * Gets the minimum non-zero instantaneous velocity of the stroke.
+     * @return The minimum positive velocity (pixels/ms). Returns 0 if none observed.
+     */
+    public float getMinVelocity() {
+        return minVelocity;
+    }
+
+    /**
+     * Sets the minimum non-zero instantaneous velocity of the stroke.
+     * @param minVelocity The minimum positive velocity (pixels/ms).
+     */
+    public void setMinVelocity(float minVelocity) {
+        this.minVelocity = minVelocity;
+    }
+
+    /**
      * Gets the specified percentile of pairwise velocities within the stroke.
      * @return The pairwise velocity percentile.
      */
@@ -248,4 +270,81 @@ public class Features {
     public void setStopY(float stopY) {
         this.stopY = stopY;
     }
+
+    /**
+     * Gets the average positive acceleration of the stroke.
+     * Units: pixels/ms^2.
+     * @return The average acceleration.
+     */
+    public float getAverageAcceleration() {
+        return averageAcceleration;
+    }
+
+    /**
+     * Sets the average positive acceleration of the stroke.
+     * Units: pixels/ms^2.
+     * @param averageAcceleration The average acceleration.
+     */
+    public void setAverageAcceleration(float averageAcceleration) {
+        this.averageAcceleration = averageAcceleration;
+    }
+
+    /**
+     * Gets the average deceleration magnitude of the stroke.
+     * Units: pixels/ms^2.
+     * @return The average deceleration magnitude.
+     */
+    public float getAverageDeceleration() {
+        return averageDeceleration;
+    }
+
+    /**
+     * Sets the average deceleration magnitude of the stroke.
+     * Units: pixels/ms^2.
+     * @param averageDeceleration The average deceleration magnitude.
+     */
+    public void setAverageDeceleration(float averageDeceleration) {
+        this.averageDeceleration = averageDeceleration;
+    }
+
+    /**
+     * Gets the total trajectory length of the stroke.
+     * This represents the total distance traveled along the stroke path.
+     * Units: pixels.
+     * @return The total path length of the stroke.
+     */
+    public float getTrajectoryLength() {
+        return trajectoryLength;
+    }
+
+    /**
+     * Sets the total trajectory length of the stroke.
+     * This represents the total distance traveled along the stroke path.
+     * Units: pixels.
+     * @param trajectoryLength The total path length of the stroke.
+     */
+    public void setTrajectoryLength(float trajectoryLength) {
+        this.trajectoryLength = trajectoryLength;
+    }
+
+    /**
+     * Gets the average path deviation (curvature) from the straight line connecting
+     * the first and last points of the stroke.
+     * Units: pixels.
+     * @return The average deviation in pixels.
+     */
+    public float getCurvature() {
+        return curvature;
+    }
+
+    /**
+     * Sets the average path deviation (curvature) from the straight line connecting
+     * the first and last points of the stroke.
+     * Units: pixels.
+     * @param curvature The average deviation in pixels.
+     */
+    public void setCurvature(float curvature) {
+        this.curvature = curvature;
+    }
+
 }

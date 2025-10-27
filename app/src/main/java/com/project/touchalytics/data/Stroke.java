@@ -337,4 +337,227 @@ public class Stroke {
         return maxVelocity;
     }
 
+    /**
+     * Calculates the minimum non-zero instantaneous velocity between consecutive points in the stroke.
+     * Velocity is computed as distance / timeDelta for each consecutive pair (pixels per millisecond).
+     * Zero-velocity segments (no movement or non-positive dt) are ignored.
+     *
+     * @return The minimum positive velocity during the stroke. Returns 0 if there are fewer than
+     *         2 points or if no positive velocities are observed.
+     */
+    public float calculateMinVelocity() {
+        if (points.size() < 2) {
+            return 0;
+        }
+
+        float minVelocity = Float.MAX_VALUE;
+
+        for (int i = 1; i < points.size(); i++) {
+            float distance = calculateDistance(points.get(i - 1), points.get(i));
+            long timeDelta = points.get(i).timestamp - points.get(i - 1).timestamp;
+
+            // Only consider segments with positive time and movement
+            if (timeDelta > 0) {
+                float velocity = distance / timeDelta; // pixels/ms
+                if (velocity > 0f && velocity < minVelocity) {
+                    minVelocity = velocity;
+                }
+            }
+        }
+
+        // If we never found a positive velocity, return 0
+        return (minVelocity == Float.MAX_VALUE) ? 0 : minVelocity;
+    }
+
+    /**
+     * Calculates the average positive acceleration (increase in instantaneous velocity)
+     * between consecutive segments of the stroke.
+     * Acceleration is computed as:
+     *   a = (v2 - v1) / ((dt1 + dt2) / 2)
+     * where v = distance / dt for each segment, and dt is in milliseconds.
+     *
+     * Units: pixels per millisecond squared (px/ms^2).
+     *
+     * @return The average positive acceleration. Returns 0 if the stroke has fewer than 3 points
+     *         or if no positive accelerations are observed.
+     */
+    public float calculateAverageAcceleration() {
+        if (points.size() < 3) {
+            return 0f;
+        }
+
+        // Build per-segment velocities and time deltas (only where dt > 0)
+        List<Float> velocities = new ArrayList<>();
+        List<Float> dts = new ArrayList<>();
+
+        for (int i = 1; i < points.size(); i++) {
+            float distance = calculateDistance(points.get(i - 1), points.get(i));
+            long dtMs = points.get(i).timestamp - points.get(i - 1).timestamp;
+            if (dtMs > 0) {
+                velocities.add(distance / dtMs);        // pixels/ms
+                dts.add((float) dtMs);                  // ms
+            }
+        }
+
+        if (velocities.size() < 2) {
+            return 0f;
+        }
+
+        float sumAcc = 0f;
+        int countAcc = 0;
+
+        for (int i = 0; i < velocities.size() - 1; i++) {
+            float v1 = velocities.get(i);
+            float v2 = velocities.get(i + 1);
+            float dt1 = dts.get(i);
+            float dt2 = dts.get(i + 1);
+            float denom = (dt1 + dt2) * 0.5f;          // average dt, in ms
+
+            if (denom > 0f) {
+                float a = (v2 - v1) / denom;           // px/ms^2
+                if (a > 0f) {
+                    sumAcc += a;
+                    countAcc++;
+                }
+            }
+        }
+
+        return countAcc > 0 ? (sumAcc / countAcc) : 0f;
+    }
+
+    /**
+     * Calculates the average deceleration magnitude (rate of velocity decrease)
+     * between consecutive segments of the stroke.
+     * Acceleration is computed as:
+     *   a = (v2 - v1) / ((dt1 + dt2) / 2)
+     * and only negative values (decelerations) are considered; their magnitudes are averaged.
+     *
+     * Units: pixels per millisecond squared (px/ms^2).
+     *
+     * @return The average deceleration magnitude. Returns 0 if the stroke has fewer than 3 points
+     *         or if no decelerations are observed.
+     */
+    public float calculateAverageDeceleration() {
+        if (points.size() < 3) {
+            return 0f;
+        }
+
+        // Build per-segment velocities and time deltas (only where dt > 0)
+        List<Float> velocities = new ArrayList<>();
+        List<Float> dts = new ArrayList<>();
+
+        for (int i = 1; i < points.size(); i++) {
+            float distance = calculateDistance(points.get(i - 1), points.get(i));
+            long dtMs = points.get(i).timestamp - points.get(i - 1).timestamp;
+            if (dtMs > 0) {
+                velocities.add(distance / dtMs);        // pixels/ms
+                dts.add((float) dtMs);                  // ms
+            }
+        }
+
+        if (velocities.size() < 2) {
+            return 0f;
+        }
+
+        float sumDec = 0f;
+        int countDec = 0;
+
+        for (int i = 0; i < velocities.size() - 1; i++) {
+            float v1 = velocities.get(i);
+            float v2 = velocities.get(i + 1);
+            float dt1 = dts.get(i);
+            float dt2 = dts.get(i + 1);
+            float denom = (dt1 + dt2) * 0.5f;          // average dt, in ms
+
+            if (denom > 0f) {
+                float a = (v2 - v1) / denom;           // px/ms^2
+                if (a < 0f) {
+                    sumDec += Math.abs(a);
+                    countDec++;
+                }
+            }
+        }
+
+        return countDec > 0 ? (sumDec / countDec) : 0f;
+    }
+
+    /**
+     * Calculates the total distance traveled along the stroke path.
+     * This is the sum of Euclidean distances between consecutive points.
+     * @return The total path length in pixels. Returns 0 if the stroke has fewer than 2 points.
+     */
+    public float calculateTrajectoryLength() {
+        if (points.size() < 2) return 0;
+
+        float totalDistance = 0;
+        for (int i = 1; i < points.size(); i++) {
+            totalDistance += calculateDistance(points.get(i - 1), points.get(i));
+        }
+        return totalDistance;
+    }
+
+    /**
+     * Computes the perpendicular distance from a point to the line segment
+     * defined by start and end points, in pixels.
+     * If the segment is degenerate (start == end), returns distance to start.
+     *
+     * @param p The point whose distance to the segment is measured.
+     * @param start The starting point of the segment.
+     * @param end The ending point of the segment.
+     * @return The perpendicular distance in pixels.
+     */
+    private float perpendicularDistanceToSegment(TouchPoint p, TouchPoint start, TouchPoint end) {
+        float dx = end.x - start.x;
+        float dy = end.y - start.y;
+        float lengthSq = dx * dx + dy * dy;
+
+        if (lengthSq == 0f) { // start and end coincide
+            return calculateDistance(p, start);
+        }
+
+        // Project p onto the line (start->end), clamped to the segment [0,1]
+        float t = ((p.x - start.x) * dx + (p.y - start.y) * dy) / lengthSq;
+        t = Math.max(0f, Math.min(1f, t));
+
+        float projX = start.x + t * dx;
+        float projY = start.y + t * dy;
+
+        float diffX = p.x - projX;
+        float diffY = p.y - projY;
+
+        return (float) Math.hypot(diffX, diffY);
+    }
+
+
+    /**
+     * Calculates the average path deviation (curvature) from the straight line
+     * connecting the first and last points of the stroke.
+     * The deviation is computed as the average perpendicular distance of all
+     * interior points to the end-to-end line segment.
+     *
+     * Units: pixels.
+     *
+     * @return The average deviation in pixels. Returns 0 if the stroke has fewer than 3 points.
+     */
+    public float calculateAveragePathDeviation() {
+        if (points.size() < 3) {
+            return 0f;
+        }
+
+        TouchPoint start = points.get(0);
+        TouchPoint end = points.get(points.size() - 1);
+
+        float sum = 0f;
+        int count = 0;
+
+        // Only interior points contribute to deviation
+        for (int i = 1; i < points.size() - 1; i++) {
+            sum += perpendicularDistanceToSegment(points.get(i), start, end);
+            count++;
+        }
+
+        return count > 0 ? (sum / count) : 0f;
+    }
+
+
 }
