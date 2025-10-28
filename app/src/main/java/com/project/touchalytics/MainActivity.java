@@ -252,6 +252,8 @@ public class MainActivity extends AppCompatActivity {
         features.setAverageDeceleration(currentStroke.calculateAverageDeceleration());
         features.setTrajectoryLength(currentStroke.calculateTrajectoryLength());
         features.setCurvature(currentStroke.calculateAveragePathDeviation());
+        features.setVelocityVariance(currentStroke.calculateVelocityVariance());
+        features.setAngleChangeRate(currentStroke.calculateAngleChangeRate());
 
 
         if (strokeCount < Constants.MIN_STROKE_COUNT) {

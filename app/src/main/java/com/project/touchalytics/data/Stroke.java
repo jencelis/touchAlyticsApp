@@ -559,5 +559,213 @@ public class Stroke {
         return count > 0 ? (sum / count) : 0f;
     }
 
+    /**
+     * Calculates a scale-invariant velocity variance using the squared coefficient of variation (CV^2).
+     * This is variance(v) / mean(v)^2, which is unitless and invariant to overall speed scaling.
+     *
+     * Steps:
+     *  - Build per-segment speeds v = distance / dt (px/ms).
+     *  - Ignore segments with very small dt or tiny movement to reduce jitter.
+     *  - Compute sample mean and sample variance (Welford's algorithm).
+     *  - Return CV^2 = variance / (mean*mean).
+     *
+     * @return Unitless scale-invariant velocity variance (CV^2). Returns 0 if insufficient data.
+     */
+    public float calculateVelocityVariance() {
+        if (points.size() < 2) {
+            return 0f;
+        }
+
+        // Minimal guards (tune lightly if needed)
+        final float MIN_DT_MS   = 5f;  // ignore dt < 5 ms
+        final float MIN_DIST_PX = 2f;  // ignore movement < 2 px
+
+        // First pass: collect valid speeds and compute mean/variance via Welford
+        int n = 0;
+        float mean = 0f;
+        float m2   = 0f;
+
+        for (int i = 1; i < points.size(); i++) {
+            float dist = calculateDistance(points.get(i - 1), points.get(i));
+            long  dtMs = points.get(i).timestamp - points.get(i - 1).timestamp;
+
+            if (dtMs <= 0) continue;
+            if (dtMs < (long) MIN_DT_MS) continue;
+            if (dist < MIN_DIST_PX) continue;
+
+            float v = dist / (float) dtMs; // px/ms
+
+            // Welford updates
+            n += 1;
+            float delta  = v - mean;
+            mean += delta / n;
+            float delta2 = v - mean;
+            m2 += delta * delta2;
+        }
+
+        if (n < 2 || mean <= 0f) {
+            return 0f;
+        }
+
+        float var = m2 / (n - 1);      // sample variance (px/ms)^2
+        return var / (mean * mean);    // CV^2 (unitless), scale-invariant
+    }
+
+    /**
+     * Calculates the direction change frequency ("angleChangeRate") using a classic
+     * Freeman chain-code approach:
+     *
+     * Steps:
+     *  1) Resample the stroke at a fixed spatial step (e.g., 5 px) to reduce speed effects.
+     *  2) Quantize each step's heading into one of 8 compass bins (0..7).
+     *  3) Count direction changes when the quantized bin changes and persists
+     *     for a few steps (debounce) to avoid jitter double-counting.
+     *  4) Normalize by total duration => changes per second.
+     *
+     * Units: changes per second.
+     *
+     * @return Direction change frequency (changes/s). Returns 0 if insufficient data.
+     */
+    public float calculateAngleChangeRate() {
+        // Need at least 3 raw points to form 2 steps
+        if (points.size() < 3) return 0f;
+
+        // --- Parameters ---
+        final float STEP_PX        = 5f;  // spatial resampling step
+        final int   PERSIST_STEPS  = 2;   // require new bin to persist this many steps
+        final float MIN_STEP_PX    = 1.0f;
+
+        // 1) Resample path by distance (approx. equal-length steps)
+        List<ResampledPoint> sp = resampleByDistance(STEP_PX);
+        if (sp.size() < 3) return 0f;
+
+        // 2) Quantize headings into 8-direction Freeman chain-code bins
+        final int m = sp.size();
+        int[] bins = new int[m - 1];
+        for (int i = 1; i < m; i++) {
+            float dx = sp.get(i).x - sp.get(i - 1).x;
+            float dy = sp.get(i).y - sp.get(i - 1).y;
+            float len = (float) Math.hypot(dx, dy);
+            if (len < MIN_STEP_PX) {
+                bins[i - 1] = bins[Math.max(0, i - 2)]; // repeat previous bin if step too small
+            } else {
+                float ang = (float) Math.atan2(dy, dx); // [-π, π]
+                bins[i - 1] = quantizeDir8(ang);
+            }
+        }
+
+        // 3) Count debounced direction transitions
+        int changes = 0;
+        int currentBin = bins[0];
+        int pendingBin = currentBin;
+        int persistCount = 0;
+
+        for (int i = 1; i < bins.length; i++) {
+            int b = bins[i];
+            if (b == currentBin) {
+                // same direction, reset any pending switch
+                pendingBin = currentBin;
+                persistCount = 0;
+            } else {
+                // potential change: require it to persist PERSIST_STEPS
+                if (b == pendingBin) {
+                    persistCount++;
+                } else {
+                    pendingBin = b;
+                    persistCount = 1;
+                }
+                if (persistCount >= PERSIST_STEPS) {
+                    changes++;
+                    currentBin = pendingBin;
+                    persistCount = 0;
+                }
+            }
+        }
+
+        // 4) Normalize by duration
+        float durationMs = points.get(points.size() - 1).timestamp - points.get(0).timestamp;
+        if (durationMs <= 0f) return 0f;
+        return (changes * 1000f) / durationMs;
+    }
+
+    /**
+     * Quantizes an angle (radians) into one of 8 compass bins (0..7).
+     * Bin 0 centered on 0 rad (east), increasing counter-clockwise.
+     */
+    private int quantizeDir8(float ang) {
+        // Map [-π, π] to [0, 2π), then to 8 bins
+        if (ang < 0) ang += (float) (2.0 * Math.PI);
+        float sector = (float) (2.0 * Math.PI / 8.0);
+        int bin = (int) Math.floor((ang + sector * 0.5f) / sector);
+        if (bin >= 8) bin = 0;
+        return bin;
+    }
+
+    /**
+     * Helper container for resampled points.
+     */
+    private static class ResampledPoint {
+        final float x;
+        final float y;
+        final long tMs;
+        ResampledPoint(float x, float y, long tMs) {
+            this.x = x; this.y = y; this.tMs = tMs;
+        }
+    }
+
+    /**
+     * Resamples the stroke polyline at approximately fixed spatial steps.
+     * Preserves timing by linearly interpolating timestamps along segments.
+     *
+     * @param stepPx Desired step length in pixels.
+     * @return List of resampled points (>= 2 if there was movement).
+     */
+    private List<ResampledPoint> resampleByDistance(float stepPx) {
+        List<ResampledPoint> out = new ArrayList<>();
+        if (points.isEmpty()) return out;
+
+        TouchPoint p0 = points.get(0);
+        out.add(new ResampledPoint(p0.x, p0.y, p0.timestamp));
+
+        float carry = 0f;
+
+        for (int i = 1; i < points.size(); i++) {
+            TouchPoint a = points.get(i - 1);
+            TouchPoint b = points.get(i);
+            float segDx = b.x - a.x;
+            float segDy = b.y - a.y;
+            float segLen = (float) Math.hypot(segDx, segDy);
+            if (segLen <= 0f) continue;
+
+            float ux = segDx / segLen;
+            float uy = segDy / segLen;
+
+            float placedFromA = 0f;
+            while (placedFromA + (stepPx - carry) <= segLen) {
+                float d = placedFromA + (stepPx - carry);
+                float rx = a.x + ux * d;
+                float ry = a.y + uy * d;
+
+                float ratio = d / segLen;
+                long rt = a.timestamp + (long) ((b.timestamp - a.timestamp) * ratio);
+
+                out.add(new ResampledPoint(rx, ry, rt));
+
+                placedFromA = d;
+                carry = 0f;
+            }
+
+            float remaining = segLen - placedFromA;
+            carry = Math.min(stepPx, carry + remaining);
+        }
+
+        TouchPoint last = points.get(points.size() - 1);
+        ResampledPoint tail = out.get(out.size() - 1);
+        if (tail.x != last.x || tail.y != last.y) {
+            out.add(new ResampledPoint(last.x, last.y, last.timestamp));
+        }
+
+        return out;
+    }
 
 }

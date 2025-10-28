@@ -15,6 +15,7 @@ public class Features {
     private float averageVelocity;
     private float maxVelocity; // peak instantaneous velocity (pixels/ms)
     private float minVelocity; // minimum non-zero instantaneous velocity (pixels/ms)
+    private float velocityVariance; // variance of segment velocities ((pixels/ms)^2)
     private float pairwiseVelocityPercentile;
     private float startX;
     private float stopX;
@@ -24,7 +25,7 @@ public class Features {
     private float averageDeceleration; // average deceleration magnitude (pixels/ms^2)
     private float trajectoryLength; // total distance traveled along stroke path (pixels)
     private float curvature; // average deviation from straight line (pixels)
-
+    private float angleChangeRate; // direction change frequency (changes/s)
 
     /**
      * Default constructor for Features.
@@ -192,6 +193,24 @@ public class Features {
     }
 
     /**
+     * Gets the variance of instantaneous velocities within the stroke.
+     * Units: (pixels/ms)^2.
+     * @return The velocity variance.
+     */
+    public float getVelocityVariance() {
+        return velocityVariance;
+    }
+
+    /**
+     * Sets the variance of instantaneous velocities within the stroke.
+     * Units: (pixels/ms)^2.
+     * @param velocityVariance The velocity variance.
+     */
+    public void setVelocityVariance(float velocityVariance) {
+        this.velocityVariance = velocityVariance;
+    }
+
+    /**
      * Gets the specified percentile of pairwise velocities within the stroke.
      * @return The pairwise velocity percentile.
      */
@@ -347,4 +366,21 @@ public class Features {
         this.curvature = curvature;
     }
 
+    /**
+     * Gets the direction change frequency ("angleChangeRate") of the stroke.
+     * Units: changes per second.
+     * @return The direction change frequency.
+     */
+    public float getAngleChangeRate() {
+        return angleChangeRate;
+    }
+
+    /**
+     * Sets the direction change frequency ("angleChangeRate") of the stroke.
+     * Units: changes per second.
+     * @param angleChangeRate The direction change frequency.
+     */
+    public void setAngleChangeRate(float angleChangeRate) {
+        this.angleChangeRate = angleChangeRate;
+    }
 }

@@ -38,43 +38,6 @@ public class TouchPoint {
     }
 
     /**
-     * Computes the Euclidean distance from this point to another point, in pixels.
-     *
-     * @param other The other touch point.
-     * @return The distance in pixels.
-     */
-    float distanceTo(TouchPoint other) {
-        float dx = other.x - this.x;
-        float dy = other.y - this.y;
-        return (float) Math.hypot(dx, dy);
-    }
-
-    /**
-     * Computes the positive time difference from this point to another point, in seconds.
-     * Returns 0 if the time difference is non-positive.
-     *
-     * @param other The other touch point.
-     * @return The time delta in seconds, or 0 if non-positive.
-     */
-    float dtSecondsTo(TouchPoint other) {
-        long dtMs = other.timestamp - this.timestamp;
-        return dtMs > 0 ? (dtMs / 1000f) : 0f;
-    }
-
-    /**
-     * Computes the instantaneous speed from this point to another, in pixels/second.
-     * Returns 0 if the time difference is non-positive.
-     *
-     * @param other The other touch point.
-     * @return The speed in pixels per second, or 0 if dt <= 0.
-     */
-    float speedTo(TouchPoint other) {
-        float dt = dtSecondsTo(other);
-        if (dt <= 0f) return 0f;
-        return distanceTo(other) / dt;
-    }
-
-    /**
      * Returns a string representation of the TouchPoint object.
      *
      * @return A string containing the x, y, timestamp, pressure, size, touchMajor, and touchMinor of the touch point.
