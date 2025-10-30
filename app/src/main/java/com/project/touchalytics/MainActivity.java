@@ -254,7 +254,11 @@ public class MainActivity extends AppCompatActivity {
         features.setCurvature(currentStroke.calculateAveragePathDeviation());
         features.setVelocityVariance(currentStroke.calculateVelocityVariance());
         features.setAngleChangeRate(currentStroke.calculateAngleChangeRate());
-
+        features.setMaxPressure(currentStroke.calculateMaxPressure());
+        features.setMinPressure(currentStroke.calculateMinPressure());
+        features.setInitPressure(currentStroke.calculateInitPressure());
+        features.setPressureChangeRate(currentStroke.calculatePressureChangeRate());
+        features.setPressureVariance(currentStroke.calculatePressureVariance());
 
         if (strokeCount < Constants.MIN_STROKE_COUNT) {
             Log.i(LOG_TAG, "Adding to Firebase");

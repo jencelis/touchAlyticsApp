@@ -9,6 +9,11 @@ public class Features {
     private float strokeDuration;
     private float midStrokeArea;
     private float midStrokePressure;
+    private float maxPressure; // highest pressure applied
+    private float minPressure; // lowest pressure recorded
+    private float initPressure; // Initial pressure recorded
+    private float pressureChangeRate; // pressure change frequency
+    private float pressureVariance; // pressure variance
     private float touchArea; // average pixel contact area (px^2)
     private float directionEndToEnd;
     private float averageDirection;
@@ -94,6 +99,86 @@ public class Features {
      */
     public void setMidStrokePressure(float midStrokePressure) {
         this.midStrokePressure = midStrokePressure;
+    }
+
+    /**
+     * Gets the maximum pressure recorded during the stroke.
+     * @return The highest pressure applied.
+     */
+    public float getMaxPressure() {
+        return maxPressure;
+    }
+
+    /**
+     * Sets the maximum pressure recorded during the stroke.
+     * @param maxPressure The highest pressure applied.
+     */
+    public void setMaxPressure(float maxPressure) {
+        this.maxPressure = maxPressure;
+    }
+
+    /**
+     * Gets the minimum pressure recorded during the stroke.
+     * @return The lowest pressure recorded.
+     */
+    public float getMinPressure() {
+        return minPressure;
+    }
+
+    /**
+     * Sets the minimum pressure recorded during the stroke.
+     * @param minPressure The lowest pressure recorded.
+     */
+    public void setMinPressure(float minPressure) {
+        this.minPressure = minPressure;
+    }
+
+    /**
+     * Gets the initial pressure recorded during the stroke.
+     * @return The lowest pressure recorded.
+     */
+    public float getInitPressure() {
+        return initPressure;
+    }
+
+    /**
+     * Sets the initial pressure recorded during the stroke.
+     * @param initPressure The initial pressure recorded.
+     */
+    public void setInitPressure(float initPressure) {
+        this.initPressure = initPressure;
+    }
+
+    /**
+     * Gets the pressure change rate from the stroke.
+     * @return The pressure change rate.
+     */
+    public float getPressureChangeRate() {
+        return pressureChangeRate;
+    }
+
+    /**
+     * Sets the pressure change rate from the stroke.
+     * @param pressureChangeRate The pressure change rate recorded.
+     */
+    public void setPressureChangeRate(float pressureChangeRate) {
+        this.pressureChangeRate = pressureChangeRate;
+    }
+
+    /**
+     * Gets the pressure variance from the stroke.
+     * @return The pressure variance.
+     */
+    public float getPressureVariance() {
+        return pressureVariance;
+    }
+
+    /**
+     * Sets the pressure variance from the stroke.
+     * @param pressureVariance The pressure variance recorded.
+     */
+    public void setPressureVariance(float pressureVariance) {
+        this.pressureVariance = pressureVariance;
     }
 
     /**
@@ -383,4 +468,5 @@ public class Features {
     public void setAngleChangeRate(float angleChangeRate) {
         this.angleChangeRate = angleChangeRate;
     }
+
 }

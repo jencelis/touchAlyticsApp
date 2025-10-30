@@ -708,14 +708,17 @@ public class Stroke {
         final float x;
         final float y;
         final long tMs;
-        ResampledPoint(float x, float y, long tMs) {
-            this.x = x; this.y = y; this.tMs = tMs;
+        final float p; // normalized pressure
+
+        ResampledPoint(float x, float y, long tMs, float p) {
+            this.x = x; this.y = y; this.tMs = tMs; this.p = p;
         }
     }
 
     /**
      * Resamples the stroke polyline at approximately fixed spatial steps.
      * Preserves timing by linearly interpolating timestamps along segments.
+     * Also interpolates pressure between points.
      *
      * @param stepPx Desired step length in pixels.
      * @return List of resampled points (>= 2 if there was movement).
@@ -725,7 +728,7 @@ public class Stroke {
         if (points.isEmpty()) return out;
 
         TouchPoint p0 = points.get(0);
-        out.add(new ResampledPoint(p0.x, p0.y, p0.timestamp));
+        out.add(new ResampledPoint(p0.x, p0.y, p0.timestamp, p0.pressure));
 
         float carry = 0f;
 
@@ -748,8 +751,9 @@ public class Stroke {
 
                 float ratio = d / segLen;
                 long rt = a.timestamp + (long) ((b.timestamp - a.timestamp) * ratio);
+                float rp = a.pressure + (b.pressure - a.pressure) * ratio;
 
-                out.add(new ResampledPoint(rx, ry, rt));
+                out.add(new ResampledPoint(rx, ry, rt, rp));
 
                 placedFromA = d;
                 carry = 0f;
@@ -762,10 +766,126 @@ public class Stroke {
         TouchPoint last = points.get(points.size() - 1);
         ResampledPoint tail = out.get(out.size() - 1);
         if (tail.x != last.x || tail.y != last.y) {
-            out.add(new ResampledPoint(last.x, last.y, last.timestamp));
+            out.add(new ResampledPoint(last.x, last.y, last.timestamp, last.pressure));
         }
 
         return out;
+    }
+
+    /**
+     * Calculates the pressure change frequency ("pressureChangeRate") as the average
+     * absolute difference in pressure between consecutive resampled points,
+     * normalized by total duration.
+     *
+     * Steps:
+     *  1) Resample the stroke by distance (e.g., 5 px steps) to remove speed bias.
+     *  2) Compute absolute pressure differences between consecutive samples.
+     *  3) Sum them, divide by duration to yield an average change rate (Δpressure/sec).
+     *
+     * Units: changes per second (Δpressure per second).
+     *
+     * @return The average rate of pressure change (changes/s). Returns 0 if insufficient data.
+     * Assumption: Pressure is in [0,1].
+     */
+    public float calculatePressureChangeRate() {
+        if (points.size() < 3) return 0f;
+
+        // --- Parameters ---
+        final float STEP_PX = 5f;   // resampling step (pixels)
+
+        // 1) Resample stroke by distance (pressure interpolated)
+        List<ResampledPoint> sp = resampleByDistance(STEP_PX);
+        if (sp.size() < 3) return 0f;
+
+        // 2) Compute total absolute change in pressure
+        float totalChange = 0f;
+        for (int i = 1; i < sp.size(); i++) {
+            totalChange += Math.abs(sp.get(i).p - sp.get(i - 1).p);
+        }
+
+        // 3) Normalize by total stroke duration
+        float durationMs = points.get(points.size() - 1).timestamp - points.get(0).timestamp;
+        if (durationMs <= 0f) return 0f;
+
+        // Convert ms → s to report in changes per second
+        return (totalChange * 1000f) / durationMs;
+    }
+
+    /**
+     * Calculates the pressure variability ("pressureVariance") as the sample variance
+     * of per-point pressures across the stroke using Welford's online algorithm.
+     *
+     * Notes:
+     *  - Simple approach (no resampling): uses all recorded touch samples as-is.
+     *  - With pressure assumed in [0,1], the variance is in [0, 0.25].
+     *
+     * @return The sample variance of pressure (unitless). Returns 0 if fewer than 2 points.
+     * Assumption: Pressure is in [0,1].
+     */
+    public float calculatePressureVariance() {
+        if (points.size() < 2) return 0f;
+
+        int n = 0;
+        float mean = 0f;
+        float m2 = 0f;
+
+        for (TouchPoint p : points) {
+            float x = p.pressure;
+            n += 1;
+            float delta = x - mean;
+            mean += delta / n;
+            float delta2 = x - mean;
+            m2 += delta * delta2;
+        }
+
+        return n > 1 ? (m2 / (n - 1)) : 0f; // sample variance
+    }
+
+    /**
+     * Calculates the maximum pressure recorded during the stroke.
+     * @return The highest pressure observed. Returns 0 if the stroke has no points.
+     * Assumption: Stick to a 0-1 range, however we are aware different devices can have
+     *             different pressure ranges, for simplicity we will ignore this
+     */
+    public float calculateMaxPressure() {
+        if (points.isEmpty()) return 0;
+
+        float max = points.get(0).pressure;
+        for (TouchPoint p : points) {
+            if (p.pressure > max) {
+                max = p.pressure;
+            }
+        }
+        return max;
+    }
+
+    /**
+     * Calculates the minimum pressure recorded during the stroke.
+     * @return The lowest pressure observed. Returns 0 if the stroke has no points
+     * Assumption: Stick to a 0-1 range, however we are aware different devices can have
+     *             different pressure ranges, for simplicity we will ignore this
+     */
+    public float calculateMinPressure() {
+        if (points.isEmpty()) return 0;
+
+        float min = points.get(0).pressure;
+        for (TouchPoint p : points) {
+            if (p.pressure < min) {
+                min = p.pressure;
+            }
+        }
+        return min;
+    }
+
+    /**
+     * Calculates the initial pressure recorded during the stroke.
+     * @return The initial pressure observed. Returns 0 if the stroke has no points
+     * Assumption: Stick to a 0-1 range, however we are aware different devices can have
+     *             different pressure ranges, for simplicity we will ignore this
+     */
+    public float calculateInitPressure() {
+        if (points.isEmpty()) return 0;
+        return points.get(0).pressure;
     }
 
 }
