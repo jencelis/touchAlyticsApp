@@ -42,15 +42,14 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent">
-
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
                     android:text="hub"
                     android:textColor="@android:color/white"
+                    android:textStyle="bold"
                     android:textSize="24sp"
-                    android:textStyle="bold" />
+                    android:layout_gravity="center"/>
             </FrameLayout>
 
             <TextView
@@ -69,10 +68,10 @@
                 android:layout_marginTop="12dp"/>
 
             <TextView
-                android:id="@+id/loginTitle"
+                android:id="@+id/registerTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/login"
+                android:text="@string/register"
                 android:textColor="@color/hub_textDark"
                 android:textStyle="bold"
                 android:textSize="40sp"
@@ -80,6 +79,30 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="28dp"/>
+
+            <!-- Name -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/nameLayout"
+                style="@style/Widget.Material3.TextInputLayout.FilledBox"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:hint="@string/name"
+                app:boxBackgroundColor="@android:color/white"
+                app:boxCornerRadiusTopStart="14dp"
+                app:boxCornerRadiusTopEnd="14dp"
+                app:boxCornerRadiusBottomStart="14dp"
+                app:boxCornerRadiusBottomEnd="14dp"
+                app:layout_constraintTop_toBottomOf="@id/registerTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:layout_marginTop="24dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/nameInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPersonName"/>
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Email -->
             <com.google.android.material.textfield.TextInputLayout
@@ -93,10 +116,10 @@
                 app:boxCornerRadiusTopEnd="14dp"
                 app:boxCornerRadiusBottomStart="14dp"
                 app:boxCornerRadiusBottomEnd="14dp"
-                app:layout_constraintTop_toBottomOf="@id/loginTitle"
+                app:layout_constraintTop_toBottomOf="@id/nameLayout"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="24dp">
+                android:layout_marginTop="12dp">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/emailInput"
@@ -130,72 +153,35 @@
                     android:inputType="textPassword"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView
-                android:id="@+id/forgotPasswordLink"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/forgot_password_q"
-                android:textColor="@color/hub_primary"
-                android:textSize="16sp"
-                app:layout_constraintTop_toBottomOf="@id/passwordLayout"
-                app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="8dp"/>
-
-            <!-- Primary: Login -->
+            <!-- Primary: Register -->
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/loginButton"
+                android:id="@+id/registerButton"
                 style="@style/Widget.Material3.Button"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
-                android:text="@string/login"
+                android:text="@string/register"
                 android:textAllCaps="false"
                 android:textStyle="bold"
                 android:textSize="20sp"
                 app:cornerRadius="20dp"
                 app:backgroundTint="@color/hub_primary"
-                app:layout_constraintTop_toBottomOf="@id/forgotPasswordLink"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="18dp"/>
-
-            <TextView
-                android:id="@+id/noAccount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/no_account"
-                android:textColor="@color/hub_textDark"
-                android:textSize="18sp"
-                app:layout_constraintTop_toBottomOf="@id/loginButton"
+                app:layout_constraintTop_toBottomOf="@id/passwordLayout"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="20dp"/>
 
+            <!-- Back to login -->
             <TextView
-                android:id="@+id/createAccountLink"
+                android:id="@+id/loginRedirectLink"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/create_account"
-                android:textColor="@color/hub_primary"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                app:layout_constraintTop_toBottomOf="@id/noAccount"
+                android:text="@string/already_have_account_login"
+                android:textColor="@color/hub_textDark"
+                android:textSize="18sp"
+                app:layout_constraintTop_toBottomOf="@id/registerButton"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="6dp"/>
-
-            <!-- Privacy sentence with inline clickable span -->
-            <TextView
-                android:id="@+id/privacyNote"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:text="@string/privacy_sentence"
-                android:textColor="@color/hub_textMedium"
-                android:textSize="16sp"
-                android:lineSpacingExtra="2dp"
-                app:layout_constraintTop_toBottomOf="@id/createAccountLink"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="24dp"/>
+                android:layout_marginTop="22dp"/>
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>
 
