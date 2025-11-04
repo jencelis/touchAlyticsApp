@@ -165,6 +165,32 @@ public class Stroke {
     }
 
     /**
+     * Calculates the total pixel contact area across the entire stroke.
+     * Uses the contact ellipse from MotionEvent (touchMajor/touchMinor) in pixels:
+     * area = π * (touchMajor / 2) * (touchMinor / 2).
+     *
+     * @return The total touch contact area in pixels^2. Returns 0 if no usable points exist.
+     */
+    public float calculateTotalTouchArea() {
+
+        if (points.isEmpty()) return 0;
+
+        double totalArea = 0;
+        int validCount = 0;
+
+        for (TouchPoint point : points) {
+            if (point.touchMajor > 0 && point.touchMinor > 0) {
+                double area = Math.PI * (point.touchMajor / 2.0) * (point.touchMinor / 2.0);
+                totalArea += area;
+                validCount++;
+            }
+        }
+
+        return validCount > 0 ? (float) totalArea : 0f;
+    }
+
+
+    /**
      * Calculates the Euclidean distance between two {@link TouchPoint} objects.
      * @param p1 The first touch point.
      * @param p2 The second touch point.
@@ -272,6 +298,24 @@ public class Stroke {
     public float getStopY() {
         return points.get(points.size() - 1).y;
     }
+
+
+    /**
+     * Gets the displacement on the x axis.
+     * @return displacement of x coordinates.
+     */
+    public float calculateXDisplacement(){
+        return Math.abs(getStartX()-getStopX());
+    }
+
+    /**
+     * Gets the displacement on the y axis.
+     * @return displacement of y coordinates.
+     */
+    public float calculateYDisplacement(){
+        return Math.abs(getStartY()-getStopY());
+    }
+
 
     /**
      * Calculates the average direction of the stroke by averaging the direction between consecutive points.
@@ -887,5 +931,83 @@ public class Stroke {
         if (points.isEmpty()) return 0;
         return points.get(0).pressure;
     }
+
+    /**
+     * Calculates the maximum idle time within the stroke.
+     * "Idle" is defined as consecutive intervals between samples where the
+     * movement is smaller than a small distance threshold.
+     *
+     * Steps:
+     *  - Walk through consecutive point pairs.
+     *  - If distance < IDLE_DIST_PX and dt > 0, accumulate into the current idle block.
+     *  - Otherwise, close the current idle block and track the maximum.
+     *
+     * Units: milliseconds.
+     *
+     * @return The longest continuous idle duration in milliseconds.
+     *         Returns 0 if the stroke has fewer than 2 points.
+     * Assumption: A displacement below ~1–2 pixels is effectively "no movement".
+     */
+    public long calculateMaxIdleTime() {
+        if (points.size() < 2) return 0L;
+
+        final float IDLE_DIST_PX = 10.0f; // movement threshold to consider "idle" (pixels)
+
+        long currentIdleMs = 0L;
+        long maxIdleMs = 0L;
+
+        for (int i = 1; i < points.size(); i++) {
+            TouchPoint a = points.get(i - 1);
+            TouchPoint b = points.get(i);
+
+            long dtMs = b.timestamp - a.timestamp;
+            if (dtMs <= 0L) {
+                // Non-positive time delta: skip but do not break any current idle run
+                continue;
+            }
+
+            float distPx = calculateDistance(a, b);
+            if (distPx <= IDLE_DIST_PX) {
+                // Still idle: accumulate this interval
+                currentIdleMs += dtMs;
+                if (currentIdleMs > maxIdleMs) {
+                    maxIdleMs = currentIdleMs;
+                }
+            } else {
+                // Movement detected: end the current idle block
+                currentIdleMs = 0L;
+            }
+        }
+
+        return maxIdleMs;
+    }
+
+    /**
+     * Calculates the straightness ratio of the stroke.
+     * Defined as the end-to-end (chord) distance divided by the total
+     * trajectory length (path length).
+     *
+     * Interpretation:
+     *  - 1.0  → perfectly straight stroke (path equals the chord).
+     *  - ~0   → very curvy/loopy stroke (path much longer than the chord).
+     *
+     * Units: unitless in (0, 1]. Returns 0 if the stroke has fewer than 2 points
+     * or if the total path length is zero.
+     *
+     * @return The straightness ratio (end-to-end / trajectory length).
+     */
+    public float calculateStraightnessRatio() {
+        if (points.size() < 2) return 0f;
+
+        float pathLen = calculateTrajectoryLength(); // sum of segment lengths
+        if (pathLen <= 0f) return 0f;
+
+        TouchPoint start = points.get(0);
+        TouchPoint end   = points.get(points.size() - 1);
+
+        float chord = calculateDistance(start, end); // end-to-end distance
+        return chord / pathLen; // mathematically ≤ 1 for valid paths
+    }
+
 
 }
