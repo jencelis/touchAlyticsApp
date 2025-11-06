@@ -245,6 +245,25 @@ public class MainActivity extends AppCompatActivity {
         features.setStopX(currentStroke.getStopX());
         features.setStartY(currentStroke.getStartY());
         features.setStopY(currentStroke.getStopY());
+        features.setTouchArea(currentStroke.calculateTotalTouchArea());
+        features.setAverageTouchArea(currentStroke.calculateAverageTouchArea());
+        features.setMaxVelocity(currentStroke.calculateMaxVelocity());
+        features.setMinVelocity(currentStroke.calculateMinVelocity());
+        features.setAverageAcceleration(currentStroke.calculateAverageAcceleration());
+        features.setAverageDeceleration(currentStroke.calculateAverageDeceleration());
+        features.setTrajectoryLength(currentStroke.calculateTrajectoryLength());
+        features.setCurvature(currentStroke.calculateAveragePathDeviation());
+        features.setVelocityVariance(currentStroke.calculateVelocityVariance());
+        features.setAngleChangeRate(currentStroke.calculateAngleChangeRate());
+        features.setMaxPressure(currentStroke.calculateMaxPressure());
+        features.setMinPressure(currentStroke.calculateMinPressure());
+        features.setInitPressure(currentStroke.calculateInitPressure());
+        features.setPressureChangeRate(currentStroke.calculatePressureChangeRate());
+        features.setPressureVariance(currentStroke.calculatePressureVariance());
+        features.setXDis(currentStroke.calculateXDisplacement());
+        features.setYDis(currentStroke.calculateYDisplacement());
+        features.setMaxIdleTime(currentStroke.calculateMaxIdleTime());
+        features.setStraightnessRatio(currentStroke.calculateStraightnessRatio());
 
         if (strokeCount < Constants.MIN_STROKE_COUNT) {
             Log.i(LOG_TAG, "Adding to Firebase");
