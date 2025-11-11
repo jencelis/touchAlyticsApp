@@ -30,6 +30,8 @@ import com.google.android.material.textfield.TextInputLayout;
  *  - Verify screen (activity_verify.xml)
  * We swap layouts inside this activity and wire their events here.
  */
+
+
 public class LoginActivity extends AppCompatActivity {
 
     // Common (used per-screen)
@@ -187,6 +189,11 @@ public class LoginActivity extends AppCompatActivity {
             verifySubtitle.setText(getString(R.string.verify_subtitle_with_email, pendingEmail));
         }
 
+
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra(MainActivity.EXTRA_USER_ID, userID);
+        startActivity(intent);
         TextInputLayout codeLayout = findViewById(R.id.codeLayout);
         TextInputEditText codeInput = findViewById(R.id.codeInput);
         primaryButton = findViewById(R.id.continueButton);

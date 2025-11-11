@@ -1,20 +1,38 @@
 package com.project.touchalytics;
 
 import android.os.Bundle;
-import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
+import android.app.Activity;
+import android.view.Window;
+import android.view.WindowManager;
 
-public class FruitNinjaActivity extends AppCompatActivity {
+public class FruitNinjaActivity extends Activity {
+
+    private GameView gameView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Placeholder—replace with your game view later
-        TextView tv = new TextView(this);
-        tv.setText("Fruit Ninja – Coming Soon!");
-        tv.setTextSize(24f);
-        tv.setPadding(32, 32, 32, 32);
-        setContentView(tv);
+        // Full screen setup
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+        // Initialize game view
+        gameView = new GameView(this);
+        setContentView(gameView);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        gameView.pause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        gameView.resume();
     }
 }

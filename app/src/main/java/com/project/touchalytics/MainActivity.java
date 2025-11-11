@@ -30,6 +30,13 @@ import android.webkit.WebViewClient;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -40,6 +47,12 @@ import retrofit2.Response;
  * and communicates with Firebase and a backend server for enrollment and verification.
  */
 public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "SocketClient";
+    private static final String SERVER_IP = "128.153.220.233"; // <-- Replace with your PC's LAN IP
+    private static final int SERVER_PORT = 7000;
+    private TextView textView;
+
 
     public static final String EXTRA_USER_ID = "EXTRA_USER_ID";
     public static final String LOG_TAG = "MainActivity";
@@ -81,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Log.i(LOG_TAG, "Logged In as UserID: " + userID);
+//        sendToPython(String.valueOf(userID));
 
         FirebaseApp.initializeApp(this);
         database = FirebaseDatabase.getInstance().getReference();
@@ -274,45 +288,66 @@ public class MainActivity extends AppCompatActivity {
             updateStatusBar();
         } else {
             Log.i(LOG_TAG, "Sending features to server");
-            sendToServer(features);
+            sendToPython(features);
         }
     }
 
-    /**
-     * Sends the extracted features of a swipe to the backend server for verification.
-     * Updates the UI based on the server's response (match or no match).
-     * @param features The Features object containing data from the swipe.
-     */
-    public void sendToServer(@NonNull Features features) {
-        Call<JsonObject> response = apiService.sendFeatures(userID, features);
 
-        response.enqueue(new Callback<>() {
-            @Override
-            public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
-                if (response.isSuccessful() && response.body() != null) {
+    private JSONObject featuresToJSON(Features features) {
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("userID", features.getUserID());
+            obj.put("strokeDuration", features.getStrokeDuration());
+            obj.put("midStrokeArea", features.getMidStrokeArea());
+            obj.put("midStrokePressure", features.getMidStrokePressure());
+            obj.put("directionEndToEnd", features.getDirectionEndToEnd());
+            obj.put("averageDirection", features.getAverageDirection());
+            obj.put("averageVelocity", features.getAverageVelocity());
+            obj.put("pairwiseVelocityPercentile", features.getPairwiseVelocityPercentile());
+            obj.put("startX", features.getStartX());
+            obj.put("stopX", features.getStopX());
+            obj.put("startY", features.getStartY());
+            obj.put("stopY", features.getStopY());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return obj;
+    }
 
-                    boolean prediction = response.body().get("match").getAsBoolean();
-                    String message = response.body().get("message").getAsString();
-                    Log.i(LOG_TAG, "Features sent successfully: " + message);
 
-                    if(prediction) { // matched
-                        matchedCount++;
-                    } else { //not matched
-                        notMatchedCount++;
-                    }
-                    updateStatusBar();
-                } else {
-                    Log.e(LOG_TAG, "Server returned an error: " + response.message());
-                    Snackbar.make(findViewById(android.R.id.content), "Error: " + response.message(), Snackbar.LENGTH_SHORT).show();
-                }
+    private void sendToPython(Features features) {
+        new Thread(() -> {
+            try {
+                Socket socket = new Socket(SERVER_IP, SERVER_PORT);
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+
+                // Convert Features to JSON string
+                String jsonString = featuresToJSON(features).toString();
+
+                // Send raw UTF-8 bytes
+                byte[] bytes = jsonString.getBytes("UTF-8");
+                dos.write(bytes);  // no writeUTF()
+                dos.flush();
+
+                // Optionally send a newline or delimiter if you want to read multiple messages
+                // dos.write("\n".getBytes("UTF-8"));
+                // dos.flush();
+
+                // Read response (if your server sends one)
+                byte[] buffer = new byte[1024];
+                int read = dis.read(buffer);
+                String response = new String(buffer, 0, read, "UTF-8");
+                System.out.println("Server Response: " + response);
+
+                dos.close();
+                dis.close();
+                socket.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-
-            @Override
-            public void onFailure(@NonNull Call<JsonObject> call, @NonNull Throwable t) {
-                Log.e(LOG_TAG, "Failed to send features: " + t.getMessage());
-                Snackbar.make(findViewById(android.R.id.content), "Error: " + t.getMessage(), Snackbar.LENGTH_SHORT).show();
-            }
-        });
+        }).start();
     }
 
 }
