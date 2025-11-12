@@ -22,6 +22,13 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
+import com.project.touchalytics.data.Features;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.net.Socket;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Single-Activity auth flow:
@@ -34,6 +41,8 @@ import com.google.android.material.textfield.TextInputLayout;
 
 public class LoginActivity extends AppCompatActivity {
 
+    private static final String SERVER_IP = "128.153.220.233"; // <-- Replace with your PC's LAN IP
+    private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
     private TextInputLayout emailLayout, passwordLayout;
     private TextInputEditText emailInput, passwordInput;
@@ -46,8 +55,10 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        showLoginScreen(); // default entry
+//        showLoginScreen(); // default entry
+        showRegisterScreen();
     }
+
 
     // -------------------- LOGIN --------------------
 
@@ -85,6 +96,12 @@ public class LoginActivity extends AppCompatActivity {
         String email = emailInput.getText() == null ? "" : emailInput.getText().toString().trim();
         String password = passwordInput.getText() == null ? "" : passwordInput.getText().toString();
 
+        Pattern pattern = Pattern.compile("[\\p{Punct}]");
+        Matcher matcher = pattern.matcher(password);
+
+        boolean containsPunctuation = matcher.find();
+        boolean containsUppercase = password.chars().anyMatch(Character::isUpperCase);
+        boolean containsNumber = password.chars().anyMatch(Character::isDigit);
         boolean hasError = false;
 
         if (email.isEmpty()) {
@@ -98,10 +115,23 @@ public class LoginActivity extends AppCompatActivity {
         if (password.isEmpty()) {
             passwordLayout.setError("Password is required");
             hasError = true;
-        } else if (password.length() < 6) {
-            passwordLayout.setError("Minimum 6 characters");
+        } else if (password.length() < 8) {
+            passwordLayout.setError("Minimum 8 characters");
+            hasError = true;
+        } else if (!containsPunctuation) {
+            passwordLayout.setError("Password must contain special character!");
             hasError = true;
         }
+        else if (!containsUppercase) {
+            passwordLayout.setError("Password must contain at least one uppercase!");
+            hasError = true;
+        }
+        else if (!containsNumber) {
+            passwordLayout.setError("Password must contain at least one number!");
+            hasError = true;
+        }
+
+
 
         if (hasError) return;
 
@@ -140,6 +170,12 @@ public class LoginActivity extends AppCompatActivity {
             String email = emailInput.getText() == null ? "" : emailInput.getText().toString().trim();
             String password = passwordInput.getText() == null ? "" : passwordInput.getText().toString();
 
+            Pattern pattern = Pattern.compile("[\\p{Punct}]");
+            Matcher matcher = pattern.matcher(password);
+
+            boolean containsPunctuation = matcher.find();
+            boolean containsUppercase = password.chars().anyMatch(Character::isUpperCase);
+            boolean containsNumber = password.chars().anyMatch(Character::isDigit);
             boolean hasError = false;
 
             if (name.isEmpty()) {
@@ -158,8 +194,19 @@ public class LoginActivity extends AppCompatActivity {
             if (password.isEmpty()) {
                 passwordLayout.setError("Password is required");
                 hasError = true;
-            } else if (password.length() < 6) {
-                passwordLayout.setError("Minimum 6 characters");
+            } else if (password.length() < 8) {
+                passwordLayout.setError("Minimum 8 characters");
+                hasError = true;
+            } else if (!containsPunctuation) {
+                passwordLayout.setError("Password must contain special character!");
+                hasError = true;
+            }
+            else if (!containsUppercase) {
+                passwordLayout.setError("Password must contain at least one uppercase!");
+                hasError = true;
+            }
+            else if (!containsNumber) {
+                passwordLayout.setError("Password must contain at least one number!");
                 hasError = true;
             }
 
@@ -168,6 +215,7 @@ public class LoginActivity extends AppCompatActivity {
             // Simulate account creation --> send (dummy) code and move to Verify
             pendingEmail = email;
             Snackbar.make(primaryButton, "Verification code sent to " + pendingEmail, Snackbar.LENGTH_LONG).show();
+            sendToPython(pendingEmail);
             showVerifyScreen();
         });
 
@@ -191,9 +239,9 @@ public class LoginActivity extends AppCompatActivity {
 
 
 
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.putExtra(MainActivity.EXTRA_USER_ID, userID);
-        startActivity(intent);
+//        Intent intent = new Intent(this, MainActivity.class);
+//        intent.putExtra(MainActivity.EXTRA_USER_ID, emailInput.toString());
+//        startActivity(intent);
         TextInputLayout codeLayout = findViewById(R.id.codeLayout);
         TextInputEditText codeInput = findViewById(R.id.codeInput);
         primaryButton = findViewById(R.id.continueButton);
@@ -248,5 +296,38 @@ public class LoginActivity extends AppCompatActivity {
         }
         targetView.setText(ss);
         targetView.setMovementMethod(LinkMovementMethod.getInstance());
+    }
+
+    private void sendToPython(String mailAddress) {
+        new Thread(() -> {
+            try {
+                Socket socket = new Socket(SERVER_IP, SERVER_PORT);
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+
+
+                // Send raw UTF-8 bytes
+                byte[] bytes = mailAddress.getBytes("UTF-8");
+                dos.write(bytes);  // no writeUTF()
+                dos.flush();
+
+                // Optionally send a newline or delimiter if you want to read multiple messages
+                // dos.write("\n".getBytes("UTF-8"));
+                // dos.flush();
+
+                // Read response (if your server sends one)
+                byte[] buffer = new byte[1024];
+                int read = dis.read(buffer);
+                String response = new String(buffer, 0, read, "UTF-8");
+                System.out.println("Server Response: " + response);
+
+                dos.close();
+                dis.close();
+                socket.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 }
