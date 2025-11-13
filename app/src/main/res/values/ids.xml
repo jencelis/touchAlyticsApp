@@ -1,3 +1,5 @@
 <resources>
     <item name="key_color_tag" type="id"/>
+    <item name="ta_down" type="id"/>
+    <item name="game_view" type="id"/>
 </resources>

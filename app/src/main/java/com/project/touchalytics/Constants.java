@@ -21,4 +21,9 @@ public class Constants {
      * This should match the value in TouchalyticsServer.
      */
     public static final Integer MIN_STROKE_COUNT = 50;
+
+    /**
+     * The minimum number of taps required for training.
+     */
+    public static final Integer MIN_TAP_COUNT = 20;
 }
