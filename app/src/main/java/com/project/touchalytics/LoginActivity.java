@@ -2,6 +2,7 @@ package com.project.touchalytics;
 
 import android.content.Intent;
 import android.graphics.Typeface;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -24,9 +25,15 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.project.touchalytics.data.Features;
 
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.Socket;
+import java.net.URL;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,8 +47,9 @@ import java.util.regex.Pattern;
 
 
 public class LoginActivity extends AppCompatActivity {
+    private Integer receivedToken = null;
 
-    private static final String SERVER_IP = "128.153.220.233"; // <-- Replace with your PC's LAN IP
+    private static final String SERVER_IP = "128.153.221.200"; // <-- Replace with your PC's LAN IP
     private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
     private TextInputLayout emailLayout, passwordLayout;
@@ -248,6 +256,7 @@ public class LoginActivity extends AppCompatActivity {
 
         TextView resendCodeLink = findViewById(R.id.resendCodeLink);
         TextView changeEmailLink = findViewById(R.id.changeEmailLink);
+        new GetTokenTask().execute();
 
         // Continue -> validate 6-digit code and proceed to MainMenu
         primaryButton.setOnClickListener(v -> {
@@ -257,10 +266,11 @@ public class LoginActivity extends AppCompatActivity {
             if (code.length() != 6 || !code.matches("\\d{6}")) {
                 codeLayout.setError("Enter the 6-digit code");
                 return;
+            } else if (code.equals(String.valueOf(receivedToken))) {
+                Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
+                startActivity(new Intent(this, MainMenuActivity.class));
             }
 
-            Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
-            startActivity(new Intent(this, MainMenuActivity.class));
         });
 
         resendCodeLink.setOnClickListener(v ->
@@ -298,7 +308,57 @@ public class LoginActivity extends AppCompatActivity {
         targetView.setMovementMethod(LinkMovementMethod.getInstance());
     }
 
-    private void sendToPython(String mailAddress) {
+    public int getIntegerFromServer() throws Exception {
+        URL url = new URL("http://128.153.221.200:5000/get_token");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+//        conn.setConnectTimeout(5000);
+//        conn.setReadTimeout(5000);
+
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(conn.getInputStream())
+        );
+
+        StringBuilder result = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            result.append(line);
+        }
+
+        reader.close();
+        conn.disconnect();
+
+        // Parse JSON manually
+        JSONObject json = new JSONObject(result.toString());
+        return json.getInt("token");
+    }
+
+
+    private class GetTokenTask extends AsyncTask<Void, Void, Integer> {
+
+        @Override
+        protected Integer doInBackground(Void... voids) {
+            try {
+                return getIntegerFromServer();  // Your existing function
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Integer token) {
+            if (token != null) {
+                System.out.println("Received token: " + token);
+                // You can store it for later if needed
+                receivedToken = token;
+            } else {
+                System.out.println("Failed to fetch token from server.");
+            }
+        }
+    }
+
+    private void sendToPython(String userInfo) {
         new Thread(() -> {
             try {
                 Socket socket = new Socket(SERVER_IP, SERVER_PORT);
@@ -307,7 +367,7 @@ public class LoginActivity extends AppCompatActivity {
 
 
                 // Send raw UTF-8 bytes
-                byte[] bytes = mailAddress.getBytes("UTF-8");
+                byte[] bytes = userInfo.getBytes("UTF-8");
                 dos.write(bytes);  // no writeUTF()
                 dos.flush();
 
