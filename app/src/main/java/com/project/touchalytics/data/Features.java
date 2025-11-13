@@ -27,8 +27,8 @@ public class Features {
     private float stopX;
     private float startY;
     private float stopY;
-    private float disX;     // X axis displacement
-    private float disY;     // Y axis displacement
+    private float xdis;     // X axis displacement
+    private float ydis;     // Y axis displacement
     private float averageAcceleration; // average positive acceleration (pixels/ms^2)
     private float averageDeceleration; // average deceleration magnitude (pixels/ms^2)
     private float trajectoryLength; // total distance traveled along stroke path (pixels)
@@ -384,7 +384,7 @@ public class Features {
      * @return The x axis displacement.
      */
     public float getXDis() {
-        return disX;
+        return xdis;
     }
 
     /**
@@ -392,7 +392,7 @@ public class Features {
      * @param xDis The x axis displacement.
      */
     public void setXDis(float xDis) {
-        this.disX = xDis;
+        this.xdis = xDis;
     }
 
     /**
@@ -400,7 +400,7 @@ public class Features {
      * @return The y axis displacement.
      */
     public float getYDis() {
-        return disY;
+        return ydis;
     }
 
     /**
@@ -408,7 +408,7 @@ public class Features {
      * @param yDis The y axis displacement.
      */
     public void setYDis(float yDis) {
-        this.disY = yDis;
+        this.ydis = yDis;
     }
 
     /**

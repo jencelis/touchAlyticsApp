@@ -9,7 +9,7 @@ public class Constants {
      * The base URL of the server.
      * Change to the IP address and port of your TouchalyticsServer.
      */
-    public static final String SERVER_BASE_URL = "http://10.128.6.180:5000";
+    public static final String SERVER_BASE_URL = "http://128.153.220.163:5000";
 
     /**
      * The URL of the home website for scrolling.
