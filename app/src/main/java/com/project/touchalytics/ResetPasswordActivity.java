@@ -11,6 +11,9 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class ResetPasswordActivity extends AppCompatActivity {
 
     private TextInputLayout newPasswordLayout;
@@ -51,6 +54,26 @@ public class ResetPasswordActivity extends AppCompatActivity {
 
                 if (confirmPassword.isEmpty()) {
                     confirmPasswordLayout.setError("Please fill out all fields");
+                    return;
+                }
+
+                Pattern pattern = Pattern.compile("[\\p{Punct}]");
+                Matcher matcher = pattern.matcher(newPassword);
+                boolean containsPunctuation = matcher.find();
+                boolean containsUppercase = newPassword.chars().anyMatch(Character::isUpperCase);
+                boolean containsNumber = newPassword.chars().anyMatch(Character::isDigit);
+
+                if (newPassword.length() < 8) {
+                    newPasswordLayout.setError("Minimum 8 characters");
+                    return;
+                } else if (!containsPunctuation) {
+                    newPasswordLayout.setError("Password must contain special character!");
+                    return;
+                } else if (!containsUppercase) {
+                    newPasswordLayout.setError("Password must contain at least one uppercase!");
+                    return;
+                } else if (!containsNumber) {
+                    newPasswordLayout.setError("Password must contain at least one number!");
                     return;
                 }
 

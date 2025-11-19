@@ -54,8 +54,8 @@ public class LoginActivity extends AppCompatActivity {
 //    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
     private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
-    private TextInputLayout emailLayout, passwordLayout;
-    private TextInputEditText emailInput, passwordInput;
+    private TextInputLayout emailLayout, passwordLayout, confirmPasswordLayout;
+    private TextInputEditText emailInput, passwordInput, confirmPasswordInput;
     private MaterialButton primaryButton;
     private TextView forgotPasswordLink, createAccountLink, loginRedirectLink, privacyNote;
 
@@ -66,7 +66,7 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 //        showLoginScreen(); // default entry
-        showRegisterScreen();
+        showRegisterScreen("");
     }
 
 
@@ -93,7 +93,7 @@ public class LoginActivity extends AppCompatActivity {
         // Inline clickable "Privacy Policy"
         makePrivacySpan(privacyNote);
 
-        createAccountLink.setOnClickListener(v -> showRegisterScreen());
+        createAccountLink.setOnClickListener(v -> showRegisterScreen(""));
         forgotPasswordLink.setOnClickListener(v ->
                 Snackbar.make(v, "Forgot password tapped", Snackbar.LENGTH_SHORT).show());
     }
@@ -152,7 +152,7 @@ public class LoginActivity extends AppCompatActivity {
 
     // -------------------- REGISTER --------------------
 
-    private void showRegisterScreen() {
+    private void showRegisterScreen(String extraError) {
         setContentView(R.layout.activity_register);
 
         setSupportActionBar(findViewById(R.id.toolbar));
@@ -162,23 +162,36 @@ public class LoginActivity extends AppCompatActivity {
         TextInputLayout nameLayout = findViewById(R.id.nameLayout);
         TextInputEditText nameInput = findViewById(R.id.nameInput);
 
+        TextView globalErrorText = findViewById(R.id.globalErrorText);
+
         emailLayout = findViewById(R.id.emailLayout);
         passwordLayout = findViewById(R.id.passwordLayout);
+        confirmPasswordLayout = findViewById(R.id.confirmPasswordLayout);
         emailInput = findViewById(R.id.emailInput);
         passwordInput = findViewById(R.id.passwordInput);
+        confirmPasswordInput = findViewById(R.id.confirmPasswordInput);
 
         primaryButton = findViewById(R.id.registerButton);
         loginRedirectLink = findViewById(R.id.loginRedirectLink);
+
+        if (extraError != null && !extraError.trim().isEmpty()) {
+            globalErrorText.setVisibility(View.VISIBLE);
+            globalErrorText.setText(extraError);
+        }
+
 
         // Submit registration (dummy). After validation, go to Verify screen.
         primaryButton.setOnClickListener(v -> {
             nameLayout.setError(null);
             emailLayout.setError(null);
             passwordLayout.setError(null);
+            confirmPasswordLayout.setError(null);
+            globalErrorText.setVisibility(View.GONE);
 
             String name = nameInput.getText() == null ? "" : nameInput.getText().toString().trim();
             String email = emailInput.getText() == null ? "" : emailInput.getText().toString().trim();
             String password = passwordInput.getText() == null ? "" : passwordInput.getText().toString();
+            String confirmPassword = confirmPasswordInput.getText() == null ? "" : confirmPasswordInput.getText().toString();
 
             Pattern pattern = Pattern.compile("[\\p{Punct}]");
             Matcher matcher = pattern.matcher(password);
@@ -220,6 +233,14 @@ public class LoginActivity extends AppCompatActivity {
                 hasError = true;
             }
 
+            if (confirmPassword.isEmpty()) {
+                confirmPasswordLayout.setError("Password confirmation is required");
+                hasError = true;
+            } else if (!password.equals(confirmPassword)) {
+                confirmPasswordLayout.setError("Passwords do not match");
+                hasError = true;
+            }
+
             if (hasError) return;
 
             // Simulate account creation --> send (dummy) code and move to Verify
@@ -256,7 +277,6 @@ public class LoginActivity extends AppCompatActivity {
         TextInputEditText codeInput = findViewById(R.id.codeInput);
         primaryButton = findViewById(R.id.continueButton);
 
-        TextView resendCodeLink = findViewById(R.id.resendCodeLink);
         TextView changeEmailLink = findViewById(R.id.changeEmailLink);
         new GetTokenTask().execute();
 
@@ -272,15 +292,16 @@ public class LoginActivity extends AppCompatActivity {
                 Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
                 startActivity(new Intent(this, MainMenuActivity.class));
             }
+            else
+            {
+                showRegisterScreen("Error: Invalid Token");
+            }
 
         });
 
-        resendCodeLink.setOnClickListener(v ->
-                Snackbar.make(v, "Resent code to " + (pendingEmail == null ? "your email" : pendingEmail), Snackbar.LENGTH_SHORT).show());
-
         changeEmailLink.setOnClickListener(v -> {
             Snackbar.make(v, "Change email", Snackbar.LENGTH_SHORT).show();
-            showRegisterScreen();
+            showRegisterScreen("");
         });
     }
 

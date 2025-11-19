@@ -131,19 +131,6 @@
                 android:layout_marginTop="12dp">
 
                 <TextView
-                    android:id="@+id/resendCodeLink"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/resend_code"
-                    android:textColor="@color/hub_primary"
-                    android:textSize="18sp"/>
-
-                <TextView
-                    android:layout_width="16dp"
-                    android:layout_height="wrap_content"
-                    android:text=""/>
-
-                <TextView
                     android:id="@+id/changeEmailLink"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
