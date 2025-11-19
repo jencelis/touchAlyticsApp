@@ -1,5 +1,7 @@
 package com.project.touchalytics;
 
+import static com.project.touchalytics.Constants.SERVER_BASE_URL;
+
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.AsyncTask;
@@ -49,7 +51,7 @@ import java.util.regex.Pattern;
 public class LoginActivity extends AppCompatActivity {
     private Integer receivedToken = null;
 
-    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
+//    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
     private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
     private TextInputLayout emailLayout, passwordLayout;
@@ -223,7 +225,7 @@ public class LoginActivity extends AppCompatActivity {
             // Simulate account creation --> send (dummy) code and move to Verify
             pendingEmail = email;
             Snackbar.make(primaryButton, "Verification code sent to " + pendingEmail, Snackbar.LENGTH_LONG).show();
-            sendToPython(pendingEmail);
+            sendToServer(pendingEmail);
             showVerifyScreen();
         });
 
@@ -309,7 +311,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     public int getIntegerFromServer() throws Exception {
-        URL url = new URL("http://" + SERVER_IP + ":5000/listen");
+        URL url = new URL("http://" + SERVER_BASE_URL + ":5000/listen");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
 //        conn.setConnectTimeout(5000);
@@ -358,10 +360,10 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void sendToPython(String userInfo) {
+    private void sendToServer(String userInfo) {
         new Thread(() -> {
             try {
-                Socket socket = new Socket(SERVER_IP, SERVER_PORT);
+                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 

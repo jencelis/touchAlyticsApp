@@ -27,7 +27,7 @@ public class RetrofitClient {
     public static Retrofit getClient() {
         if (retrofit == null) {
             retrofit = new Retrofit.Builder()
-                    .baseUrl(Constants.SERVER_BASE_URL) // Base URL for the API
+                    .baseUrl("http://" + Constants.SERVER_BASE_URL + ":5000") // Base URL for the API
                     .addConverterFactory(GsonConverterFactory.create()) // Convert JSON to Java object
                     .build();
         }

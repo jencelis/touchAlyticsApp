@@ -1,9 +1,12 @@
 package com.project.touchalytics;
 
+import static com.project.touchalytics.Constants.SERVER_BASE_URL;
+
 import android.content.Context;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -18,6 +21,11 @@ import com.google.gson.JsonObject;
 import com.project.touchalytics.data.Features;
 import com.project.touchalytics.data.Stroke;
 
+import org.json.JSONObject;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.net.Socket;
 import java.util.ArrayList;
 
 import retrofit2.Call;
@@ -29,10 +37,10 @@ import retrofit2.Response;
  * Handles user interaction with a WebView, collects touch data,
  * and communicates with Firebase and a backend server for enrollment and verification.
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity {
 
     private static final String TAG = "SocketClient";
-    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
+//    private static final String SERVER_BASE_URL = "10.128.13.109"; // <-- Replace with your PC's LAN IP
     private static final int SERVER_PORT = 5000;
     private TextView textView;
 
@@ -228,47 +236,88 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             Log.i(LOG_TAG, "Verifying stroke. Sending features to server.");
-            sendToServer(features);
+
+            sendToPython(features);
         }
     }
+    private JSONObject featuresToJSON(Features features) {
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("userID", features.getUserID());
+            obj.put("strokeDuration", features.getStrokeDuration());
+            obj.put("midStrokeArea", features.getMidStrokeArea());
+            obj.put("midStrokePressure", features.getMidStrokePressure());
+            obj.put("directionEndToEnd", features.getDirectionEndToEnd());
+            obj.put("averageDirection", features.getAverageDirection());
+            obj.put("averageVelocity", features.getAverageVelocity());
+            obj.put("pairwiseVelocityPercentile", features.getPairwiseVelocityPercentile());
+            obj.put("startX", features.getStartX());
+            obj.put("stopX", features.getStopX());
+            obj.put("startY", features.getStartY());
+            obj.put("stopY", features.getStopY());
+            obj.put("touchArea", features.getTouchArea());
+            obj.put("maxVelo", features.getMaxVelocity());
+            obj.put("minVelo", features.getMinVelocity());
+            obj.put("aveAccel", features.getAverageAcceleration());
+            obj.put("aveDecel", features.getAverageDeceleration());
+            obj.put("trajLength", features.getTrajectoryLength());
+            obj.put("curvature", features.getCurvature());
+            obj.put("veloVariance", features.getVelocityVariance());
+            obj.put("angleChangeRate", features.getAngleChangeRate());
+            obj.put("maxPress", features.getMaxPressure());
+            obj.put("minPress", features.getMinPressure());
+            obj.put("initPress", features.getInitPressure());
+            obj.put("pressChangeRate", features.getPressureChangeRate());
+            obj.put("pressVariance", features.getPressureVariance());
 
-    private void sendToServer(@NonNull Features features) {
-        Call<JsonObject> response = apiService.sendFeatures(userID, features);
 
-        response.enqueue(new Callback<>() {
-            @Override
-            public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
-                if (response.isSuccessful() && response.body() != null) {
+            //Not sure if these are implemented yet but here for later use
 
-                    boolean prediction = response.body().get("match").getAsBoolean();
-                    String message = response.body().get("message").getAsString();
-                    Log.i(LOG_TAG, "Features sent successfully: " + message);
+//            obj.put("maxIdleTime", features.getMaxIdleTime());
+//            obj.put("straightnessRatio", features.getStraightnessRatio());
+//            obj.put("aveTouchArea", features.getAverageTouchArea());
+//            obj.put("xDisplacement", features.getXDisplacement());
+//            obj.put("yDisplacement", features.getYDisplacement());
 
-                    if(prediction) {
-                        matchedCount++;
-                    } else {
-                        notMatchedCount++;
-                    }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return obj;
+    }
 
-                    if (listener != null) {
-                        listener.onVerificationResult(prediction, matchedCount, notMatchedCount);
-                    }
-                } else {
-                    Log.e(LOG_TAG, "Server returned an error: " + response.message());
-                    if (listener != null) {
-                        listener.onError("Server error: " + response.message());
-                    }
-                }
+    private void sendToPython(Features features) {
+        new Thread(() -> {
+            try {
+                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+
+                // Convert Features to JSON string
+                String jsonString = featuresToJSON(features).toString();
+
+                // Send raw UTF-8 bytes
+                byte[] bytes = jsonString.getBytes("UTF-8");
+                dos.write(bytes);  // no writeUTF()
+                dos.flush();
+
+                // Optionally send a newline or delimiter if you want to read multiple messages
+                // dos.write("\n".getBytes("UTF-8"));
+                // dos.flush();
+
+                // Read response (if your server sends one)
+                byte[] buffer = new byte[1024];
+                int read = dis.read(buffer);
+                String response = new String(buffer, 0, read, "UTF-8");
+                System.out.println("Server Response: " + response);
+
+                dos.close();
+                dis.close();
+                socket.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-
-            @Override
-            public void onFailure(@NonNull Call<JsonObject> call, @NonNull Throwable t) {
-                Log.e(LOG_TAG, "Failed to send features: " + t.getMessage());
-                if (listener != null) {
-                    listener.onError("Failed to send features: " + t.getMessage());
-                }
-            }
-        });
+        }).start();
     }
 
     private void onTapRecorded(TapFeatures tf) {
@@ -314,47 +363,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private JSONObject featuresToJSON(Features features) {
-        JSONObject obj = new JSONObject();
-        try {
-            obj.put("userID", features.getUserID());
-            obj.put("strokeDuration", features.getStrokeDuration());
-            obj.put("midStrokeArea", features.getMidStrokeArea());
-            obj.put("midStrokePressure", features.getMidStrokePressure());
-            obj.put("directionEndToEnd", features.getDirectionEndToEnd());
-            obj.put("averageDirection", features.getAverageDirection());
-            obj.put("averageVelocity", features.getAverageVelocity());
-            obj.put("pairwiseVelocityPercentile", features.getPairwiseVelocityPercentile());
-            obj.put("startX", features.getStartX());
-            obj.put("stopX", features.getStopX());
-            obj.put("startY", features.getStartY());
-            obj.put("stopY", features.getStopY());
-            obj.put("touchArea", features.getTouchArea());
-            obj.put("maxVelo", features.getMaxVelocity());
-            obj.put("minVelo", features.getMinVelocity());
-            obj.put("aveAccel", features.getAverageAcceleration());
-            obj.put("aveDecel", features.getAverageDeceleration());
-            obj.put("trajLength", features.getTrajectoryLength());
-            obj.put("curvature", features.getCurvature());
-            obj.put("veloVariance", features.getVelocityVariance());
-            obj.put("angleChangeRate", features.getAngleChangeRate());
-            obj.put("maxPress", features.getMaxPressure());
-            obj.put("minPress", features.getMinPressure());
-            obj.put("initPress", features.getInitPressure());
-            obj.put("pressChangeRate", features.getPressureChangeRate());
-            obj.put("pressVariance", features.getPressureVariance());
-
-
-            //Not sure if these are implemented yet but here for later use
-
-//            obj.put("maxIdleTime", features.getMaxIdleTime());
-//            obj.put("straightnessRatio", features.getStraightnessRatio());
-//            obj.put("aveTouchArea", features.getAverageTouchArea());
-//            obj.put("xDisplacement", features.getXDisplacement());
-//            obj.put("yDisplacement", features.getYDisplacement());
-
-        } catch (Exception e) {
-            e.printStackTrace();
     private static class TapFeatures {
         int userId;
         String key;
@@ -480,3 +488,4 @@ public class MainActivity extends AppCompatActivity {
         private interface ToDouble { double get(TapFeatures t); }
     }
 }
+
