@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import java.util.ArrayList;
+import android.util.Log;
 
 public class SwipePath {
 
@@ -12,6 +13,14 @@ public class SwipePath {
     private Path path;
     private boolean isActive;
     private int fadeAlpha = 255;
+
+    // TESTING:
+   // private int totalSwipes = 0;
+   // private int earlyExits = 0;         // Hits found in first 5 segments
+    //private static int totalHits = 0;      // Successful collisions
+   // private static int totalMisses = 0;    // Paths that didn't hit this fruit
+  // private static int totalUserSwipes = 0;
+
 
     public SwipePath() {
         points = new ArrayList<>();
@@ -42,6 +51,16 @@ public class SwipePath {
 
     public void endPath() {
         isActive = false;
+
+        /* TESTING ONLY
+        // count actual user swipes, not intersects() calls
+        if (points.size() >= 2) {
+            totalUserSwipes++;
+            Log.d("SwipePath", String.format(
+                    "=== USER SWIPE #%d ENDED === path_length=%d points",
+                    totalUserSwipes, points.size()
+            ));
+        }*/
     }
 
     public void draw(Canvas canvas, Paint paint) {
@@ -72,6 +91,9 @@ public class SwipePath {
     public boolean intersects(Fruit fruit) {
         if (points.size() < 2) return false;
 
+        //long startTime = System.nanoTime();
+        int totalSegments = points.size() - 1;
+
         // Check if any line segment in the swipe path intersects with the fruit
         for (int i = 0; i < points.size() - 1; i++) {
             Point p1 = points.get(i);
@@ -79,12 +101,44 @@ public class SwipePath {
 
             if (lineCircleIntersection(p1.x, p1.y, p2.x, p2.y,
                     fruit.x, fruit.y, fruit.getRadius())) {
+
+                /* RELEVANT FOR TESTING ONLY
+                // HIT detected
+                long endTime = System.nanoTime();
+                double duration = (endTime - startTime) / 1_000_000.0;
+
+                // Track early exits (first 5 segments = indices 0-4)
+                boolean isEarlyExit = (i < 5);
+                if (isEarlyExit) {
+                    earlyExits++;
+                }
+                totalHits++;
+
+                Log.d("SwipePath", String.format(
+                        "HIT | segment=%d/%d | path_len=%d | time=%.5fms | early=%s | earlyRate=%.1f%%",
+                        i+1, totalSegments, points.size(), duration, isEarlyExit,
+                        (100.0 * earlyExits / totalHits)
+                ));
+                 */
+
                 return true;
             }
         }
+        /* RELEVANT FOR TESTING ONLY
+        // MISS - only reached if loop completes without hit
+        long endTime = System.nanoTime();
+        double duration = (endTime - startTime) / 1_000_000.0;
+        totalMisses++;
+
+        Log.d("SwipePath", String.format(
+                "MISS | checked_all=%d | path_len=%d | time=%.5fms",
+                totalSegments, points.size(), duration
+        ));
+
+         */
+
         return false;
     }
-
     // Check if a line segment intersects with a circle
     private boolean lineCircleIntersection(float x1, float y1, float x2, float y2,
                                            float cx, float cy, float radius) {
@@ -95,6 +149,14 @@ public class SwipePath {
         float fy = y1 - cy;
 
         float a = dx * dx + dy * dy;
+        // Handle edge case: start and end points are the same; a = 0
+        // Treat as point instead of a line segment
+        if (a == 0) {
+            // Check if the point is inside the circle
+            float distSquared = fx * fx + fy * fy;
+            return distSquared <= radius * radius;
+        }
+
         float b = 2 * (fx * dx + fy * dy);
         float c = (fx * fx + fy * fy) - radius * radius;
 
@@ -122,4 +184,6 @@ public class SwipePath {
             this.y = y;
         }
     }
+
+
 }
