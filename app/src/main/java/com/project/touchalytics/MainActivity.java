@@ -50,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "SocketClient";
     private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
-    private static final int SERVER_PORT = 7000;
+    private static final int SERVER_PORT = 5000;
     private TextView textView;
 
 
