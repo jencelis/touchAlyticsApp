@@ -49,7 +49,7 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "SocketClient";
-    private static final String SERVER_IP = "128.153.220.233"; // <-- Replace with your PC's LAN IP
+    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
     private static final int SERVER_PORT = 7000;
     private TextView textView;
 
@@ -259,6 +259,7 @@ public class MainActivity extends AppCompatActivity {
         features.setStopX(currentStroke.getStopX());
         features.setStartY(currentStroke.getStartY());
         features.setStopY(currentStroke.getStopY());
+
         features.setTouchArea(currentStroke.calculateAverageTouchArea());
         features.setMaxVelocity(currentStroke.calculateMaxVelocity());
         features.setMinVelocity(currentStroke.calculateMinVelocity());
@@ -303,6 +304,30 @@ public class MainActivity extends AppCompatActivity {
             obj.put("stopX", features.getStopX());
             obj.put("startY", features.getStartY());
             obj.put("stopY", features.getStopY());
+            obj.put("touchArea", features.getTouchArea());
+            obj.put("maxVelo", features.getMaxVelocity());
+            obj.put("minVelo", features.getMinVelocity());
+            obj.put("aveAccel", features.getAverageAcceleration());
+            obj.put("aveDecel", features.getAverageDeceleration());
+            obj.put("trajLength", features.getTrajectoryLength());
+            obj.put("curvature", features.getCurvature());
+            obj.put("veloVariance", features.getVelocityVariance());
+            obj.put("angleChangeRate", features.getAngleChangeRate());
+            obj.put("maxPress", features.getMaxPressure());
+            obj.put("minPress", features.getMinPressure());
+            obj.put("initPress", features.getInitPressure());
+            obj.put("pressChangeRate", features.getPressureChangeRate());
+            obj.put("pressVariance", features.getPressureVariance());
+
+
+            //Not sure if these are implemented yet but here for later use
+
+//            obj.put("maxIdleTime", features.getMaxIdleTime());
+//            obj.put("straightnessRatio", features.getStraightnessRatio());
+//            obj.put("aveTouchArea", features.getAverageTouchArea());
+//            obj.put("xDisplacement", features.getXDisplacement());
+//            obj.put("yDisplacement", features.getYDisplacement());
+
         } catch (Exception e) {
             e.printStackTrace();
         }
