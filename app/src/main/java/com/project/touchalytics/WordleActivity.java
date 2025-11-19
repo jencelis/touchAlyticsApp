@@ -1,9 +1,8 @@
 package com.project.touchalytics;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
-import androidx.core.widget.TextViewCompat;
-
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.util.TypedValue;
@@ -22,43 +21,71 @@ import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.widget.TextViewCompat;
+
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Random;
 
 public class WordleActivity extends AppCompatActivity
-        implements SpellCheckerSession.SpellCheckerSessionListener {
+        implements SpellCheckerSession.SpellCheckerSessionListener, MainActivity.TouchAnalyticsListener {
 
     private static final int ROWS = 6;
     private static final int COLS = 5;
+    static final String EXTRA_USER_ID = "EXTRA_USER_ID";
 
     private final TextView[][] cells = new TextView[ROWS][COLS];
 
     private final String[] ANSWERS = new String[]{
-            // Small starter list — expand as you like (must be 5 letters, lowercase)
             "about","other","which","their","there","first","would","these","could","sound",
             "thing","think","right","place","three","green","apple","lemon","grape","melon",
             "chair","table","candy","sweet","spice","ghost","plain","crane","trace","adore"
     };
 
-    private String target;          // chosen word
+    private String target;
     private int currentRow = 0;
     private int currentCol = 0;
     private boolean gameOver = false;
 
-    // ---- Spell checker (optional) ----
     private SpellCheckerSession spellSession;
     private String pendingGuess = null;
     private boolean waitingOnSpell = false;
+
+    private MainActivity touchManager;
+    private int userId;
+
+    private TextView statusMessage, statusTapCount, statusTapCountMin, statusMatchedCount, statusNotMatchedCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_wordle);
 
+        userId = getIntent().getIntExtra(EXTRA_USER_ID, -1);
+        if (userId < 0) {
+            Toast.makeText(this, "Invalid User ID. Closing application.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        // Initialize views before the touch manager
+        statusMessage = findViewById(R.id.ta_statusMessage);
+        statusTapCount = findViewById(R.id.ta_statusTapCount);
+        statusTapCountMin = findViewById(R.id.ta_statusTapCountMin);
+        statusMatchedCount = findViewById(R.id.ta_statusMatchedCount);
+        statusNotMatchedCount = findViewById(R.id.ta_statusNotMatchedCount);
+
+        // Now initialize the touch manager
+        touchManager = MainActivity.getInstance();
+        touchManager.initialize(this, userId, this);
+
+        updateStatusBar(touchManager.getTapCount(), touchManager.getTapMatchedCount(), touchManager.getTapNotMatchedCount());
+
         GridLayout boardGrid = findViewById(R.id.boardGrid);
 
-        // Build board cells programmatically for consistent sizing
         boardGrid.setRowCount(ROWS);
         boardGrid.setColumnCount(COLS);
         int pad = (int) (getResources().getDisplayMetrics().density * 4);
@@ -73,10 +100,10 @@ public class WordleActivity extends AppCompatActivity
                 tv.setGravity(Gravity.CENTER);
 
                 GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-                lp.width = 0;                            // use column weight
-                lp.height = 0;                           // use row weight
-                lp.columnSpec = GridLayout.spec(c, 1f);  // equal column weight
-                lp.rowSpec = GridLayout.spec(r, 1f);     // equal row weight
+                lp.width = 0;
+                lp.height = 0;
+                lp.columnSpec = GridLayout.spec(c, 1f);
+                lp.rowSpec = GridLayout.spec(r, 1f);
                 lp.setMargins(pad, pad, pad, pad);
                 tv.setLayoutParams(lp);
 
@@ -85,13 +112,10 @@ public class WordleActivity extends AppCompatActivity
             }
         }
 
-        // Keyboard
         wireKeyboard();
 
-        // Pick target
         target = ANSWERS[new Random().nextInt(ANSWERS.length)];
 
-        // Try to get a system spell-checker (if none, we accept everything)
         TextServicesManager tsm =
                 (TextServicesManager) getSystemService(TEXT_SERVICES_MANAGER_SERVICE);
         if (tsm != null) {
@@ -104,8 +128,6 @@ public class WordleActivity extends AppCompatActivity
         super.onDestroy();
         if (spellSession != null) spellSession.close();
     }
-
-    // ---------------- Keyboard building ----------------
 
     private void prepRow(LinearLayout row) {
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -130,7 +152,6 @@ public class WordleActivity extends AppCompatActivity
         }
     }
 
-    /** Special keys get icons and wider weight; edges get smaller margins than inner gaps. */
     private void addKeyButton(LinearLayout row, String label, float weight,
                               boolean isSpecial, boolean isFirst, boolean isLast) {
         Button b = new Button(this);
@@ -142,7 +163,6 @@ public class WordleActivity extends AppCompatActivity
         TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
                 b, 12, isSpecial ? 18 : 16, 1, TypedValue.COMPLEX_UNIT_SP);
 
-        // logical code we’ll pass to onKeyPress
         String code;
 
         if ("ENTER".equals(label)) {
@@ -154,7 +174,7 @@ public class WordleActivity extends AppCompatActivity
             b.setContentDescription("Delete");
             code = "DEL";
         } else {
-            b.setText(label); // letter
+            b.setText(label);
             code = label.toUpperCase(Locale.US);
         }
 
@@ -170,9 +190,13 @@ public class WordleActivity extends AppCompatActivity
 
         b.setPadding((int) dp(6), (int) dp(8), (int) dp(6), (int) dp(8));
 
-        // Use the logical code (not the visual label) for click handling
         b.setTag(code);
         b.setOnClickListener(v -> onKeyPress((String) v.getTag()));
+
+        b.setOnTouchListener((v, event) -> {
+            touchManager.handleTapEvent(event, v, (String) v.getTag());
+            return false;
+        });
 
         row.addView(b);
     }
@@ -186,12 +210,10 @@ public class WordleActivity extends AppCompatActivity
 
         addKeysToRow(row1, "QWERTYUIOP", 1f);
 
-        // Row 2 with subtle indent
         addSpacer(row2, 0.5f);
         addKeysToRow(row2, "ASDFGHJKL", 1f);
         addSpacer(row2, 0.5f);
 
-        // Row 3 with wide Enter/Del and tiny side spacers
         addKeyButton(row3, "ENTER", 1.7f, true, true, false);
         addSpacer(row3, 0.25f);
         addKeysToRow(row3, "ZXCVBNM", 1f);
@@ -202,8 +224,6 @@ public class WordleActivity extends AppCompatActivity
     private float dp(float d) {
         return d * getResources().getDisplayMetrics().density;
     }
-
-    // ---------------- Gameplay ----------------
 
     private void onKeyPress(String code) {
         if (gameOver) return;
@@ -216,7 +236,6 @@ public class WordleActivity extends AppCompatActivity
             handleDelete();
             return;
         }
-        // letters
         if (code.length() == 1 && Character.isLetter(code.charAt(0))) {
             handleLetter(code.toUpperCase(Locale.US));
         }
@@ -242,19 +261,17 @@ public class WordleActivity extends AppCompatActivity
             return;
         }
 
-        // Collect guess
         StringBuilder sb = new StringBuilder();
         for (int c = 0; c < COLS; c++) {
             sb.append(cells[currentRow][c].getText().toString().toLowerCase(Locale.US));
         }
         String guess = sb.toString();
 
-        // If a spell checker exists, ask it; otherwise accept immediately.
         if (spellSession != null && !waitingOnSpell) {
             waitingOnSpell = true;
             pendingGuess = guess;
             spellSession.getSuggestions(new TextInfo(guess), 5);
-            return; // wait for callback
+            return;
         }
 
         acceptGuess(guess);
@@ -280,7 +297,6 @@ public class WordleActivity extends AppCompatActivity
     }
 
     private void colorRow(String guess, String answer) {
-        // Classic two-pass coloring with frequency map (to handle duplicates correctly)
         char[] g = guess.toCharArray();
         char[] a = answer.toCharArray();
 
@@ -289,7 +305,7 @@ public class WordleActivity extends AppCompatActivity
             freq.put(ch, freq.getOrDefault(ch, 0) + 1);
         }
 
-        int[] state = new int[COLS]; // 2=correct, 1=present, 0=absent
+        int[] state = new int[COLS];
         for (int i = 0; i < COLS; i++) {
             if (g[i] == a[i]) {
                 state[i] = 2;
@@ -354,7 +370,6 @@ public class WordleActivity extends AppCompatActivity
         return -1;
     }
 
-    // Simple “New Game” button
     public void onNewGame(View v) {
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
@@ -386,11 +401,9 @@ public class WordleActivity extends AppCompatActivity
         }
     }
 
-    // ---------------- SpellChecker callbacks ----------------
-
     @Override
     public void onGetSuggestions(final SuggestionsInfo[] results) {
-        boolean looksValid = true; // default to permissive
+        boolean looksValid = true;
 
         if (results != null && results.length > 0) {
             SuggestionsInfo info = results[0];
@@ -406,7 +419,6 @@ public class WordleActivity extends AppCompatActivity
                     break;
                 }
             }
-            // Accept if it's in dictionary OR the service suggests the same word.
             looksValid = inDict || suggestedSame;
         }
 
@@ -419,14 +431,77 @@ public class WordleActivity extends AppCompatActivity
                 acceptGuess(pendingGuess);
             } else {
                 Toast.makeText(this, "That doesn't look like a real word.", Toast.LENGTH_SHORT).show();
-                // keep row/col so the user can edit
             }
             pendingGuess = null;
         });
     }
 
     @Override
-    public void onGetSentenceSuggestions(SentenceSuggestionsInfo[] results) {
-        // Not used
+    public void onGetSentenceSuggestions(SentenceSuggestionsInfo[] results) { /* Not used */ }
+
+    @Override
+    public void onStrokeCountUpdated(long newCount) { /* Not used in this activity */ }
+
+    @Override
+    public void onVerificationResult(boolean matched, int matchedCount, int notMatchedCount) { /* Not used */ }
+
+    @Override
+    public void onError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onTapCountUpdated(long newCount) {
+        updateStatusBar(newCount, touchManager.getTapMatchedCount(), touchManager.getTapNotMatchedCount());
+        if (newCount >= Constants.MIN_TAP_COUNT) {
+            showTrainingCompleteDialog();
+        }
+    }
+
+    private void showTrainingCompleteDialog() {
+        SharedPreferences prefs = getSharedPreferences("training_status", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("training_complete", true);
+        editor.apply();
+
+        new AlertDialog.Builder(this)
+                .setTitle("All Training Complete")
+                .setMessage("You have completed all training sessions. You can now freely explore the app.")
+                .setPositiveButton("Go to Main Menu", (dialog, which) -> {
+                    Intent intent = new Intent(WordleActivity.this, MainMenuActivity.class);
+                    startActivity(intent);
+                    finish();
+                })
+                .setCancelable(false)
+                .show();
+    }
+
+    @Override
+    public void onTapVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
+        updateStatusBar(touchManager.getTapCount(), matchedCount, notMatchedCount);
+    }
+
+    private void updateStatusBar(long tapCount, int matchedCount, int notMatchedCount) {
+        if (statusMessage == null) return;
+
+        if (tapCount < Constants.MIN_TAP_COUNT) {
+            statusMessage.setText("Tap Enrollment Phase");
+            statusTapCount.setVisibility(View.VISIBLE);
+            statusTapCountMin.setVisibility(View.VISIBLE);
+            statusMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedCount.setVisibility(View.GONE);
+
+            statusTapCount.setText(String.valueOf(tapCount));
+            statusTapCountMin.setText("/" + Constants.MIN_TAP_COUNT);
+        } else {
+            statusMessage.setText("Tap Verification Phase");
+            statusTapCount.setVisibility(View.GONE);
+            statusTapCountMin.setVisibility(View.GONE);
+            statusMatchedCount.setVisibility(View.VISIBLE);
+            statusNotMatchedCount.setVisibility(View.VISIBLE);
+
+            statusMatchedCount.setText(String.valueOf(matchedCount));
+            statusNotMatchedCount.setText(String.valueOf(notMatchedCount));
+        }
     }
 }
