@@ -24,7 +24,18 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class MainActivity {
+/**
+ * Main activity of the application.
+ * Handles user interaction with a WebView, collects touch data,
+ * and communicates with Firebase and a backend server for enrollment and verification.
+ */
+public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "SocketClient";
+    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
+    private static final int SERVER_PORT = 5000;
+    private TextView textView;
+
 
     public static final String LOG_TAG = "TouchAnalyticsManager";
 
@@ -303,6 +314,47 @@ public class MainActivity {
         }
     }
 
+    private JSONObject featuresToJSON(Features features) {
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("userID", features.getUserID());
+            obj.put("strokeDuration", features.getStrokeDuration());
+            obj.put("midStrokeArea", features.getMidStrokeArea());
+            obj.put("midStrokePressure", features.getMidStrokePressure());
+            obj.put("directionEndToEnd", features.getDirectionEndToEnd());
+            obj.put("averageDirection", features.getAverageDirection());
+            obj.put("averageVelocity", features.getAverageVelocity());
+            obj.put("pairwiseVelocityPercentile", features.getPairwiseVelocityPercentile());
+            obj.put("startX", features.getStartX());
+            obj.put("stopX", features.getStopX());
+            obj.put("startY", features.getStartY());
+            obj.put("stopY", features.getStopY());
+            obj.put("touchArea", features.getTouchArea());
+            obj.put("maxVelo", features.getMaxVelocity());
+            obj.put("minVelo", features.getMinVelocity());
+            obj.put("aveAccel", features.getAverageAcceleration());
+            obj.put("aveDecel", features.getAverageDeceleration());
+            obj.put("trajLength", features.getTrajectoryLength());
+            obj.put("curvature", features.getCurvature());
+            obj.put("veloVariance", features.getVelocityVariance());
+            obj.put("angleChangeRate", features.getAngleChangeRate());
+            obj.put("maxPress", features.getMaxPressure());
+            obj.put("minPress", features.getMinPressure());
+            obj.put("initPress", features.getInitPressure());
+            obj.put("pressChangeRate", features.getPressureChangeRate());
+            obj.put("pressVariance", features.getPressureVariance());
+
+
+            //Not sure if these are implemented yet but here for later use
+
+//            obj.put("maxIdleTime", features.getMaxIdleTime());
+//            obj.put("straightnessRatio", features.getStraightnessRatio());
+//            obj.put("aveTouchArea", features.getAverageTouchArea());
+//            obj.put("xDisplacement", features.getXDisplacement());
+//            obj.put("yDisplacement", features.getYDisplacement());
+
+        } catch (Exception e) {
+            e.printStackTrace();
     private static class TapFeatures {
         int userId;
         String key;

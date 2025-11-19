@@ -49,7 +49,7 @@ import java.util.regex.Pattern;
 public class LoginActivity extends AppCompatActivity {
     private Integer receivedToken = null;
 
-    private static final String SERVER_IP = "128.153.221.200"; // <-- Replace with your PC's LAN IP
+    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
     private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
     private TextInputLayout emailLayout, passwordLayout;
@@ -309,7 +309,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     public int getIntegerFromServer() throws Exception {
-        URL url = new URL("http://128.153.221.200:5000/get_token");
+        URL url = new URL("http://" + SERVER_IP + ":5000/listen");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
 //        conn.setConnectTimeout(5000);
