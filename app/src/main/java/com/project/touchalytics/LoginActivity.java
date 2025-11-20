@@ -15,6 +15,7 @@ import android.text.style.StyleSpan;
 import android.util.Patterns;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -56,8 +57,6 @@ import java.nio.charset.StandardCharsets;
 
 public class LoginActivity extends AppCompatActivity {
     private Integer receivedToken = null;
-
-//    private static final String SERVER_IP = "10.128.13.109"; // <-- Replace with your PC's LAN IP
     private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
     private TextInputLayout emailLayout, passwordLayout, confirmPasswordLayout;
@@ -272,7 +271,34 @@ public class LoginActivity extends AppCompatActivity {
             pendingPass = password;
 
             // Now actually contact the server to check + send email
-            sendEmailToServer(pendingEmail);
+            // Now actually contact the server to check + send email
+            sendEmailToServer(pendingEmail, new EmailStatusCallback() {
+                @Override
+                public void onResult(String status, JSONObject json) {
+                    if ("exists".equals(status)) {
+                        // Email already registered
+                        showRegisterScreen("Error: Email already in use");
+                    } else if ("ok".equals(status)) {
+                        // New email, token sent – go to Verify screen
+                        receivedToken = json.optInt("token", 0);
+                        Snackbar.make(primaryButton,
+                                "Verification code sent to " + pendingEmail,
+                                Snackbar.LENGTH_LONG
+                        ).show();
+                        showVerifyScreen();
+                    } else {
+                        // DB error or unexpected response
+                        showRegisterScreen("Error: Server issue, please try again.");
+                    }
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    // Network / socket / parse failure
+                    showRegisterScreen("Error: Could not contact server.");
+                }
+            });
+
 
         });
 
@@ -326,6 +352,48 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
+
+
+    // --------------- Forgot Password ----------------------------
+
+    private void showForgotPassScreen() {
+
+        MaterialButton submitButton;
+
+        setContentView(R.layout.activity_forgot_password);
+
+        setSupportActionBar(findViewById(R.id.toolbar));
+        if (getSupportActionBar() != null) getSupportActionBar().setTitle("");
+
+        emailLayout = findViewById(R.id.emailLayout);
+        emailInput = findViewById(R.id.emailInput);
+        submitButton = findViewById(R.id.submitButton);
+
+        submitButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String email = emailInput.getText().toString().trim();
+
+                if (email.isEmpty()) {
+                    emailLayout.setError("Please enter your email");
+                    return;
+                }
+
+                // TODO: Check if email exists in the database
+                boolean emailExists = true; // Dummy value for now
+
+                if (emailExists) {
+
+                // TODO: SOMETHING
+                } else {
+                    emailLayout.setError("Email not found");
+                }
+            }
+        });
+    }
+
+
+
     // -------------------- Helpers --------------------
 
     private void makePrivacySpan(TextView targetView) {
@@ -377,7 +445,13 @@ public class LoginActivity extends AppCompatActivity {
         return json.getInt("token");
     }
 
-    private void sendEmailToServer(String email) {
+
+    private interface EmailStatusCallback {
+        void onResult(String status, JSONObject json);
+        void onError(Exception e);
+    }
+
+    private void sendEmailToServer(String email, EmailStatusCallback callback) {
         new Thread(() -> {
             try {
                 Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
@@ -399,36 +473,21 @@ public class LoginActivity extends AppCompatActivity {
                 dis.close();
                 socket.close();
 
-                // Parse JSON and update UI on main thread
+                // Parse JSON
                 JSONObject json = new JSONObject(response);
                 String status = json.optString("status", "");
 
-                runOnUiThread(() -> {
-                    if ("exists".equals(status)) {
-                        // Email already registered
-                        showRegisterScreen("Error: Email already in use");
-                    } else if ("ok".equals(status)) {
-                        // New email, token sent – go to Verify screen
-                        receivedToken = json.optInt("token", 0);
-                        Snackbar.make(primaryButton,
-                                "Verification code sent to " + pendingEmail,
-                                Snackbar.LENGTH_LONG
-                        ).show();
-                        showVerifyScreen();
-                    } else {
-                        // DB error or unexpected response
-                        showRegisterScreen("Error: Server issue, please try again.");
-                    }
-                });
+                // Let the caller decide what to do with the status/json on the UI thread
+                runOnUiThread(() -> callback.onResult(status, json));
 
             } catch (Exception e) {
                 e.printStackTrace();
-                runOnUiThread(() ->
-                        showRegisterScreen("Error: Could not contact server.")
-                );
+                // Let the caller decide how to handle errors on the UI thread
+                runOnUiThread(() -> callback.onError(e));
             }
         }).start();
     }
+
 
     private void sendNewCredentialsToServer(String email, String password) {
         new Thread(() -> {

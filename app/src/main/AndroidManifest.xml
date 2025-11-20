@@ -36,19 +36,6 @@
             android:exported="true"
             android:label="App Hub" />
 
-        <!-- Forgot Password Flow -->
-        <activity
-            android:name=".ForgotPasswordActivity"
-            android:label="Forgot Password"
-            android:parentActivityName=".LoginActivity" />
-        <activity
-            android:name=".EnterSecurityCodeActivity"
-            android:label="Enter Security Code"
-            android:parentActivityName=".ForgotPasswordActivity" />
-        <activity
-            android:name=".ResetPasswordActivity"
-            android:label="Reset Password"
-            android:parentActivityName=".EnterSecurityCodeActivity" />
 
         <!-- Other Activities -->
         <activity
@@ -56,7 +43,7 @@
             android:label="Wordle"
             android:parentActivityName=".MainMenuActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android.launchMode="singleTop" />
+            android:launchMode="singleTop" />
         <activity
             android:name=".NewsMediaActivity"
             android:label="News / Media"
