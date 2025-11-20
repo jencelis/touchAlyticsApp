@@ -138,7 +138,7 @@ public class LoginActivity extends AppCompatActivity {
         String email = emailInput.getText() == null ? "" : emailInput.getText().toString().trim();
         String password = passwordInput.getText() == null ? "" : passwordInput.getText().toString();
 
-        Pattern pattern = Pattern.compile("[\\p{Punct}]");
+        Pattern pattern = Pattern.compile("[{Punct}]");
         Matcher matcher = pattern.matcher(password);
 
         boolean containsPunctuation = matcher.find();
@@ -208,7 +208,7 @@ public class LoginActivity extends AppCompatActivity {
         }
 
 
-        // Submit registration (dummy). After validation, go to Verify screen.
+        // Submit registration. After validation, go to Verify screen.
         primaryButton.setOnClickListener(v -> {
 
             emailLayout.setError(null);
@@ -220,7 +220,7 @@ public class LoginActivity extends AppCompatActivity {
             String password = passwordInput.getText() == null ? "" : passwordInput.getText().toString();
             String confirmPassword = confirmPasswordInput.getText() == null ? "" : confirmPasswordInput.getText().toString();
 
-            Pattern pattern = Pattern.compile("[\\p{Punct}]");
+            Pattern pattern = Pattern.compile("[{Punct}]");
             Matcher matcher = pattern.matcher(password);
 
             boolean containsPunctuation = matcher.find();
@@ -270,7 +270,6 @@ public class LoginActivity extends AppCompatActivity {
             pendingEmail = email;
             pendingPass = password;
 
-            // Now actually contact the server to check + send email
             // Now actually contact the server to check + send email
             sendEmailToServer(pendingEmail, new EmailStatusCallback() {
                 @Override
@@ -334,14 +333,40 @@ public class LoginActivity extends AppCompatActivity {
             if (code.length() != 6 || !code.matches("\\d{6}")) {
                 codeLayout.setError("Enter the 6-digit code");
                 return;
-            } else if (code.equals(String.valueOf(receivedToken))) {
-                Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
-                startActivity(new Intent(this, MainMenuActivity.class));
-                sendNewCredentialsToServer(pendingEmail,pendingPass);
             }
-            else
-            {
-                showRegisterScreen("Error: Invalid Token");
+
+            if (code.equals(String.valueOf(receivedToken))) {
+                sendNewCredentialsToServer(pendingEmail, pendingPass, new StoreCredentialsCallback() {
+                    @Override
+                    public void onResult(String status, JSONObject json) {
+                        if ("stored".equals(status)) {
+                            int idFromServer = json.optInt("userID", -1);
+                            if (idFromServer != -1) {
+                                userID = idFromServer;
+                                System.out.println("Stored userID in LoginActivity: " + userID);
+
+                                Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
+                                Intent intent = new Intent(LoginActivity.this, MainMenuActivity.class);
+                                intent.putExtra("userID", userID);
+                                intent.putExtra("featureCount", 0);
+                                startActivity(intent);
+                                finish();
+                            } else {
+                                showRegisterScreen("Error: Server issue, could not retrieve user ID.");
+                            }
+                        } else {
+                            String message = json.optString("message", "An unknown error occurred.");
+                            showRegisterScreen("Error: " + message);
+                        }
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        showRegisterScreen("Error: Could not contact server.");
+                    }
+                });
+            } else {
+                codeLayout.setError("Invalid token");
             }
 
         });
@@ -451,6 +476,11 @@ public class LoginActivity extends AppCompatActivity {
         void onError(Exception e);
     }
 
+    private interface StoreCredentialsCallback {
+        void onResult(String status, JSONObject json);
+        void onError(Exception e);
+    }
+
     private void sendEmailToServer(String email, EmailStatusCallback callback) {
         new Thread(() -> {
             try {
@@ -489,7 +519,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
 
-    private void sendNewCredentialsToServer(String email, String password) {
+    private void sendNewCredentialsToServer(String email, String password, StoreCredentialsCallback callback) {
         new Thread(() -> {
             try {
                 String hashedPassword = sha256(password);
@@ -522,19 +552,11 @@ public class LoginActivity extends AppCompatActivity {
                 JSONObject json = new JSONObject(response);
                 String status = json.optString("status", "");
 
-                if ("stored".equals(status)) {
-                    int idFromServer = json.optInt("userID", -1);
-                    if (idFromServer != -1) {
-                        // store on the activity field
-                        userID = idFromServer;
-                        System.out.println("Stored userID in LoginActivity: " + userID);
-                    }
-                } else {
-                    System.out.println("STORE failed or returned unexpected status: " + status);
-                }
+                runOnUiThread(() -> callback.onResult(status, json));
 
             } catch (Exception e) {
                 e.printStackTrace();
+                runOnUiThread(() -> callback.onError(e));
             }
         }).start();
     }

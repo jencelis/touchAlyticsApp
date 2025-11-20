@@ -15,7 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class FruitNinjaActivity extends AppCompatActivity implements MainActivity.TouchAnalyticsListener {
 
-    public static final String EXTRA_USER_ID = "EXTRA_USER_ID";
+    public static final String EXTRA_USER_ID = "userID";
     public static final String LOG_TAG = "FruitNinjaActivity";
     private static final int FRUIT_NINJA_MIN_STROKE_COUNT = 40;
 

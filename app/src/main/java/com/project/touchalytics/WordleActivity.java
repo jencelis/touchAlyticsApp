@@ -35,7 +35,7 @@ public class WordleActivity extends AppCompatActivity
 
     private static final int ROWS = 6;
     private static final int COLS = 5;
-    static final String EXTRA_USER_ID = "EXTRA_USER_ID";
+    static final String EXTRA_USER_ID = "userID";
 
     private final TextView[][] cells = new TextView[ROWS][COLS];
 
@@ -469,6 +469,7 @@ public class WordleActivity extends AppCompatActivity
                 .setMessage("You have completed all training sessions. You can now freely explore the app.")
                 .setPositiveButton("Go to Main Menu", (dialog, which) -> {
                     Intent intent = new Intent(WordleActivity.this, MainMenuActivity.class);
+                    intent.putExtra("userID", userId);
                     startActivity(intent);
                     finish();
                 })
