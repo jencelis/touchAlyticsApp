@@ -27,6 +27,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.project.touchalytics.data.Features;
 
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -38,6 +39,11 @@ import java.net.Socket;
 import java.net.URL;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
+
+
 
 /**
  * Single-Activity auth flow:
@@ -59,14 +65,41 @@ public class LoginActivity extends AppCompatActivity {
     private MaterialButton primaryButton;
     private TextView forgotPasswordLink, createAccountLink, loginRedirectLink, privacyNote;
 
-    // Holds the email entered during registration (to use on Verify)
+    // Holds the email, password entered during registration (to use on Verify)
     private String pendingEmail = null;
+    private String pendingPass = null;
+
+    // Holds the userID and swipeCount received from the server
+    private Integer userID = null;
+    private Integer swipeCount = 0;
+
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-//        showLoginScreen(); // default entry
-        showRegisterScreen("");
+        showLoginScreen(); // default entry
+        // showRegisterScreen("");
+    }
+
+
+    private String sha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+
+            // Convert to hex string
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            // Fallback: never return the raw password; if hashing fails, send empty hash
+            return "";
+        }
     }
 
 
@@ -142,12 +175,10 @@ public class LoginActivity extends AppCompatActivity {
         }
 
 
-
         if (hasError) return;
 
-        // TODO: Replace with real auth call. For now, proceed to MainMenu.
-        Snackbar.make(primaryButton, "Logging in…", Snackbar.LENGTH_SHORT).show();
-        startActivity(new Intent(this, MainMenuActivity.class));
+        // Call server to CHECK credentials
+        sendLoginCredentialsToServer(email, password);
     }
 
     // -------------------- REGISTER --------------------
@@ -159,8 +190,6 @@ public class LoginActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) getSupportActionBar().setTitle("");
 
         // Register fields
-        TextInputLayout nameLayout = findViewById(R.id.nameLayout);
-        TextInputEditText nameInput = findViewById(R.id.nameInput);
 
         TextView globalErrorText = findViewById(R.id.globalErrorText);
 
@@ -182,13 +211,12 @@ public class LoginActivity extends AppCompatActivity {
 
         // Submit registration (dummy). After validation, go to Verify screen.
         primaryButton.setOnClickListener(v -> {
-            nameLayout.setError(null);
+
             emailLayout.setError(null);
             passwordLayout.setError(null);
             confirmPasswordLayout.setError(null);
             globalErrorText.setVisibility(View.GONE);
 
-            String name = nameInput.getText() == null ? "" : nameInput.getText().toString().trim();
             String email = emailInput.getText() == null ? "" : emailInput.getText().toString().trim();
             String password = passwordInput.getText() == null ? "" : passwordInput.getText().toString();
             String confirmPassword = confirmPasswordInput.getText() == null ? "" : confirmPasswordInput.getText().toString();
@@ -201,10 +229,6 @@ public class LoginActivity extends AppCompatActivity {
             boolean containsNumber = password.chars().anyMatch(Character::isDigit);
             boolean hasError = false;
 
-            if (name.isEmpty()) {
-                nameLayout.setError("Name is required");
-                hasError = true;
-            }
 
             if (email.isEmpty()) {
                 emailLayout.setError("Email is required");
@@ -243,11 +267,13 @@ public class LoginActivity extends AppCompatActivity {
 
             if (hasError) return;
 
-            // Simulate account creation --> send (dummy) code and move to Verify
+            // Save for later use (verify + credentials store)
             pendingEmail = email;
-            Snackbar.make(primaryButton, "Verification code sent to " + pendingEmail, Snackbar.LENGTH_LONG).show();
-            sendToServer(pendingEmail);
-            showVerifyScreen();
+            pendingPass = password;
+
+            // Now actually contact the server to check + send email
+            sendEmailToServer(pendingEmail);
+
         });
 
         // Back to login
@@ -268,17 +294,11 @@ public class LoginActivity extends AppCompatActivity {
             verifySubtitle.setText(getString(R.string.verify_subtitle_with_email, pendingEmail));
         }
 
-
-
-//        Intent intent = new Intent(this, MainActivity.class);
-//        intent.putExtra(MainActivity.EXTRA_USER_ID, emailInput.toString());
-//        startActivity(intent);
         TextInputLayout codeLayout = findViewById(R.id.codeLayout);
         TextInputEditText codeInput = findViewById(R.id.codeInput);
         primaryButton = findViewById(R.id.continueButton);
 
         TextView changeEmailLink = findViewById(R.id.changeEmailLink);
-        new GetTokenTask().execute();
 
         // Continue -> validate 6-digit code and proceed to MainMenu
         primaryButton.setOnClickListener(v -> {
@@ -291,6 +311,7 @@ public class LoginActivity extends AppCompatActivity {
             } else if (code.equals(String.valueOf(receivedToken))) {
                 Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
                 startActivity(new Intent(this, MainMenuActivity.class));
+                sendNewCredentialsToServer(pendingEmail,pendingPass);
             }
             else
             {
@@ -356,61 +377,187 @@ public class LoginActivity extends AppCompatActivity {
         return json.getInt("token");
     }
 
-
-    private class GetTokenTask extends AsyncTask<Void, Void, Integer> {
-
-        @Override
-        protected Integer doInBackground(Void... voids) {
-            try {
-                return getIntegerFromServer();  // Your existing function
-            } catch (Exception e) {
-                e.printStackTrace();
-                return null;
-            }
-        }
-
-        @Override
-        protected void onPostExecute(Integer token) {
-            if (token != null) {
-                System.out.println("Received token: " + token);
-                // You can store it for later if needed
-                receivedToken = token;
-            } else {
-                System.out.println("Failed to fetch token from server.");
-            }
-        }
-    }
-
-    private void sendToServer(String userInfo) {
+    private void sendEmailToServer(String email) {
         new Thread(() -> {
             try {
                 Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 
-
-                // Send raw UTF-8 bytes
-                byte[] bytes = userInfo.getBytes("UTF-8");
-                dos.write(bytes);  // no writeUTF()
+                // Send the email as raw UTF-8
+                byte[] bytes = email.getBytes("UTF-8");
+                dos.write(bytes);
                 dos.flush();
 
-                // Optionally send a newline or delimiter if you want to read multiple messages
-                // dos.write("\n".getBytes("UTF-8"));
-                // dos.flush();
-
-                // Read response (if your server sends one)
+                // Read response
                 byte[] buffer = new byte[1024];
                 int read = dis.read(buffer);
                 String response = new String(buffer, 0, read, "UTF-8");
-                System.out.println("Server Response: " + response);
+                System.out.println("Server Response (email): " + response);
 
                 dos.close();
                 dis.close();
                 socket.close();
+
+                // Parse JSON and update UI on main thread
+                JSONObject json = new JSONObject(response);
+                String status = json.optString("status", "");
+
+                runOnUiThread(() -> {
+                    if ("exists".equals(status)) {
+                        // Email already registered
+                        showRegisterScreen("Error: Email already in use");
+                    } else if ("ok".equals(status)) {
+                        // New email, token sent – go to Verify screen
+                        receivedToken = json.optInt("token", 0);
+                        Snackbar.make(primaryButton,
+                                "Verification code sent to " + pendingEmail,
+                                Snackbar.LENGTH_LONG
+                        ).show();
+                        showVerifyScreen();
+                    } else {
+                        // DB error or unexpected response
+                        showRegisterScreen("Error: Server issue, please try again.");
+                    }
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() ->
+                        showRegisterScreen("Error: Could not contact server.")
+                );
+            }
+        }).start();
+    }
+
+    private void sendNewCredentialsToServer(String email, String password) {
+        new Thread(() -> {
+            try {
+                String hashedPassword = sha256(password);
+
+                String deviceId = android.provider.Settings.Secure.getString(
+                        getContentResolver(),
+                        android.provider.Settings.Secure.ANDROID_ID
+                );
+
+                String payload = "STORE|" + email + "|" + hashedPassword + "|" + deviceId;
+
+                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+
+                byte[] bytes = payload.getBytes("UTF-8");
+                dos.write(bytes);
+                dos.flush();
+
+                byte[] buffer = new byte[1024];
+                int read = dis.read(buffer);
+                String response = new String(buffer, 0, read, "UTF-8");
+                System.out.println("Server Response (STORE): " + response);
+
+                dos.close();
+                dis.close();
+                socket.close();
+
+                // Parse JSON and store userID
+                JSONObject json = new JSONObject(response);
+                String status = json.optString("status", "");
+
+                if ("stored".equals(status)) {
+                    int idFromServer = json.optInt("userID", -1);
+                    if (idFromServer != -1) {
+                        // store on the activity field
+                        userID = idFromServer;
+                        System.out.println("Stored userID in LoginActivity: " + userID);
+                    }
+                } else {
+                    System.out.println("STORE failed or returned unexpected status: " + status);
+                }
 
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }).start();
     }
+
+    private void sendLoginCredentialsToServer(String email, String password) {
+        new Thread(() -> {
+            try {
+                // 1. Hash password with SHA-256 (same as registration)
+                String hashedPassword = sha256(password);
+
+                // 2. Grab device ID
+                String deviceId = android.provider.Settings.Secure.getString(
+                        getContentResolver(),
+                        android.provider.Settings.Secure.ANDROID_ID
+                );
+
+                // 3. Build CHECK payload
+                String payload = "CHECK|" + email + "|" + hashedPassword + "|" + deviceId;
+
+                // 4. Open socket and send
+                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+
+                dos.write(payload.getBytes("UTF-8"));
+                dos.flush();
+
+                // 5. Read response
+                byte[] buffer = new byte[1024];
+                int read = dis.read(buffer);
+                String response = new String(buffer, 0, read, "UTF-8");
+                System.out.println("Server Response (CHECK): " + response);
+
+                dos.close();
+                dis.close();
+                socket.close();
+
+                // 6. Parse JSON and update UI
+                JSONObject json = new JSONObject(response);
+                String status = json.optString("status", "");
+
+                runOnUiThread(() -> {
+                    if ("good".equals(status)) {
+                        int idFromServer = json.optInt("userID", -1);
+                        int featureCount = json.optInt("features", -1);
+
+                        // store in class fields
+                        userID = idFromServer;
+                        swipeCount = featureCount;
+
+                        // PRINT THEM SO YOU CAN VERIFY
+                        System.out.println("Parsed userID from server: " + userID);
+                        System.out.println("Parsed swipeCount from server: " + swipeCount);
+
+                        Snackbar.make(primaryButton, "Login successful", Snackbar.LENGTH_SHORT).show();
+
+                        Intent intent = new Intent(this, MainMenuActivity.class);
+                        if (userID != null) {
+                            intent.putExtra("userID", userID);
+                        }
+                        intent.putExtra("featureCount", featureCount);
+                        startActivity(intent);
+                    } else if ("error".equals(status)) {
+                        String message = json.optString("message", "Invalid email or password.");
+                        passwordLayout.setError("Invalid email or password");
+                        Snackbar.make(primaryButton, message, Snackbar.LENGTH_LONG).show();
+                    } else {
+                        Snackbar.make(primaryButton,
+                                "Unexpected server response. Please try again.",
+                                Snackbar.LENGTH_LONG
+                        ).show();
+                    }
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() ->
+                        Snackbar.make(primaryButton, "Login failed: cannot reach server.", Snackbar.LENGTH_LONG).show()
+                );
+            }
+        }).start();
+    }
+
+
 }
