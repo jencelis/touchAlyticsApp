@@ -102,7 +102,7 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
         webSettings.setJavaScriptEnabled(true);
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon){
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
                 fabNext.setEnabled(webView.canGoForward());
                 fabPrevious.setEnabled(webView.canGoBack());
@@ -175,14 +175,5 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
     public void onError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
-
-    @Override
-    public void onTapCountUpdated(long newCount) {
-        // Not used in this activity
-    }
-
-    @Override
-    public void onTapVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
-        // Not used in this activity
-    }
 }
+

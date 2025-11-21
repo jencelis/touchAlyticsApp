@@ -57,7 +57,7 @@ public class WordleActivity extends AppCompatActivity
     private MainActivity touchManager;
     private int userId;
 
-    private TextView statusMessage, statusTapCount, statusTapCountMin, statusMatchedCount, statusNotMatchedCount;
+    private TextView statusMessage, statusStrokeCount, statusStrokeCountMin, statusMatchedCount, statusNotMatchedCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,8 +73,8 @@ public class WordleActivity extends AppCompatActivity
 
         // Initialize views before the touch manager
         statusMessage = findViewById(R.id.ta_statusMessage);
-        statusTapCount = findViewById(R.id.ta_statusTapCount);
-        statusTapCountMin = findViewById(R.id.ta_statusTapCountMin);
+        statusStrokeCount = findViewById(R.id.ta_statusTapCount);
+        statusStrokeCountMin = findViewById(R.id.ta_statusTapCountMin);
         statusMatchedCount = findViewById(R.id.ta_statusMatchedCount);
         statusNotMatchedCount = findViewById(R.id.ta_statusNotMatchedCount);
 
@@ -82,7 +82,7 @@ public class WordleActivity extends AppCompatActivity
         touchManager = MainActivity.getInstance();
         touchManager.initialize(this, userId, this);
 
-        updateStatusBar(touchManager.getTapCount(), touchManager.getTapMatchedCount(), touchManager.getTapNotMatchedCount());
+        updateStatusBar(touchManager.getStrokeCount(), touchManager.getMatchedCount(), touchManager.getNotMatchedCount());
 
         GridLayout boardGrid = findViewById(R.id.boardGrid);
 
@@ -194,7 +194,7 @@ public class WordleActivity extends AppCompatActivity
         b.setOnClickListener(v -> onKeyPress((String) v.getTag()));
 
         b.setOnTouchListener((v, event) -> {
-            touchManager.handleTapEvent(event, v, (String) v.getTag());
+            touchManager.handleTouchEvent(event);
             return false;
         });
 
@@ -440,20 +440,9 @@ public class WordleActivity extends AppCompatActivity
     public void onGetSentenceSuggestions(SentenceSuggestionsInfo[] results) { /* Not used */ }
 
     @Override
-    public void onStrokeCountUpdated(long newCount) { /* Not used in this activity */ }
-
-    @Override
-    public void onVerificationResult(boolean matched, int matchedCount, int notMatchedCount) { /* Not used */ }
-
-    @Override
-    public void onError(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-    }
-
-    @Override
-    public void onTapCountUpdated(long newCount) {
-        updateStatusBar(newCount, touchManager.getTapMatchedCount(), touchManager.getTapNotMatchedCount());
-        if (newCount >= Constants.MIN_TAP_COUNT) {
+    public void onStrokeCountUpdated(long newCount) {
+        updateStatusBar(newCount, touchManager.getMatchedCount(), touchManager.getNotMatchedCount());
+        if (newCount >= Constants.MIN_STROKE_COUNT) {
             showTrainingCompleteDialog();
         }
     }
@@ -478,31 +467,36 @@ public class WordleActivity extends AppCompatActivity
     }
 
     @Override
-    public void onTapVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
-        updateStatusBar(touchManager.getTapCount(), matchedCount, notMatchedCount);
+    public void onVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
+        updateStatusBar(touchManager.getStrokeCount(), matchedCount, notMatchedCount);
     }
 
-    private void updateStatusBar(long tapCount, int matchedCount, int notMatchedCount) {
+    private void updateStatusBar(long strokeCount, int matchedCount, int notMatchedCount) {
         if (statusMessage == null) return;
 
-        if (tapCount < Constants.MIN_TAP_COUNT) {
-            statusMessage.setText("Tap Enrollment Phase");
-            statusTapCount.setVisibility(View.VISIBLE);
-            statusTapCountMin.setVisibility(View.VISIBLE);
+        if (strokeCount < Constants.MIN_STROKE_COUNT) {
+            statusMessage.setText("Stroke Enrollment Phase");
+            statusStrokeCount.setVisibility(View.VISIBLE);
+            statusStrokeCountMin.setVisibility(View.VISIBLE);
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
 
-            statusTapCount.setText(String.valueOf(tapCount));
-            statusTapCountMin.setText("/" + Constants.MIN_TAP_COUNT);
+            statusStrokeCount.setText(String.valueOf(strokeCount));
+            statusStrokeCountMin.setText("/" + Constants.MIN_STROKE_COUNT);
         } else {
-            statusMessage.setText("Tap Verification Phase");
-            statusTapCount.setVisibility(View.GONE);
-            statusTapCountMin.setVisibility(View.GONE);
+            statusMessage.setText("Stroke Verification Phase");
+            statusStrokeCount.setVisibility(View.GONE);
+            statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.VISIBLE);
             statusNotMatchedCount.setVisibility(View.VISIBLE);
 
             statusMatchedCount.setText(String.valueOf(matchedCount));
             statusNotMatchedCount.setText(String.valueOf(notMatchedCount));
         }
+    }
+
+    @Override
+    public void onError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 }

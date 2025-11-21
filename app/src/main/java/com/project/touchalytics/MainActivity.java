@@ -62,19 +62,10 @@ public class MainActivity {
 
     private TouchAnalyticsListener listener;
 
-    // TAP
-    private long tapCount = 0;
-    private long lastTapEndTime = -1L;
-    private TapModel tapModel = new TapModel();
-    private int tapMatchedCount = 0;
-    private int tapNotMatchedCount = 0;
-
     public interface TouchAnalyticsListener {
         void onStrokeCountUpdated(long newCount);
         void onVerificationResult(boolean matched, int matchedCount, int notMatchedCount);
         void onError(String message);
-        void onTapCountUpdated(long newCount);
-        void onTapVerificationResult(boolean matched, int matchedCount, int notMatchedCount);
     }
 
     private MainActivity() { }
@@ -112,13 +103,6 @@ public class MainActivity {
         matchedCount = 0;
         notMatchedCount = 0;
         minStrokeCount = Constants.MIN_STROKE_COUNT;
-
-        tapCount = 0;
-        lastTapEndTime = -1L;
-        tapModel = new TapModel();
-        tapMatchedCount = 0;
-        tapNotMatchedCount = 0;
-
         Log.i(LOG_TAG, "TouchAnalyticsManager state has been reset.");
     }
 
@@ -134,12 +118,6 @@ public class MainActivity {
         return notMatchedCount;
     }
 
-    public long getTapCount() { return tapCount; }
-
-    public int getTapMatchedCount() { return tapMatchedCount; }
-
-    public int getTapNotMatchedCount() { return tapNotMatchedCount; }
-
     public void handleTouchEvent(MotionEvent event) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
@@ -153,29 +131,11 @@ public class MainActivity {
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                if (currentStroke != null && currentStroke.getPoints().size() > 3) {
+                if (currentStroke != null) {
                     currentStroke.setEndTime(event.getEventTime());
                     completeStroke();
                 }
                 currentStroke = null;
-                break;
-        }
-    }
-
-    public void handleTapEvent(MotionEvent event, View view, String logicalCode) {
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                view.setTag(R.id.ta_down, TapCapture.fromDown(event, view));
-                break;
-            case MotionEvent.ACTION_UP:
-                TapCapture down = (TapCapture) view.getTag(R.id.ta_down);
-                if (down != null) {
-                    TapFeatures tf = TapFeatures.fromUp(
-                            down, event, view, logicalCode, userID, lastTapEndTime);
-                    onTapRecorded(tf);
-                    lastTapEndTime = tf.endTimeMs;
-                    view.setTag(R.id.ta_down, null);
-                }
                 break;
         }
     }
@@ -300,9 +260,6 @@ public class MainActivity {
                 dos.write(bytes);  // no writeUTF()
                 dos.flush();
 
-                // Optionally send a newline or delimiter if you want to read multiple messages
-                // dos.write("\n".getBytes("UTF-8"));
-                // dos.flush();
 
                 // Read response (if your server sends one)
                 byte[] buffer = new byte[1024];
@@ -319,173 +276,4 @@ public class MainActivity {
             }
         }).start();
     }
-
-    private void onTapRecorded(TapFeatures tf) {
-        if (tapCount < Constants.MIN_TAP_COUNT) {
-            tapModel.addEnrollment(tf);
-            tapCount++;
-            if (tapCount == Constants.MIN_TAP_COUNT) {
-                tapModel.finalizeModel();
-                if(listener != null) listener.onTapCountUpdated(tapCount);
-            }
-            if (listener != null) {
-                listener.onTapCountUpdated(tapCount);
-            }
-            return;
-        }
-
-        // Verification phase
-        boolean good = tapModel.isGoodTap(tf);
-        if (good) tapMatchedCount++; else tapNotMatchedCount++;
-        if (listener != null) {
-            listener.onTapVerificationResult(good, tapMatchedCount, tapNotMatchedCount);
-        }
-    }
-
-    private static class TapCapture {
-        final long downTimeMs;
-        final float downPressure;
-        final float downSize;
-        final int downPointers;
-        final float localDownX, localDownY;
-
-        private TapCapture(long t, float p, float s, int c, float lx, float ly) {
-            downTimeMs = t; downPressure = p; downSize = s; downPointers = c; localDownX = lx; localDownY = ly;
-        }
-        static TapCapture fromDown(MotionEvent e, View v) {
-            return new TapCapture(
-                    e.getEventTime(),
-                    e.getPressure(),
-                    e.getSize(),
-                    e.getPointerCount(),
-                    e.getX(), e.getY()
-            );
-        }
-    }
-
-    private static class TapFeatures {
-        int userId;
-        String key;
-        long startTimeMs;
-        long endTimeMs;
-        long durationMs;
-        float downPressure, upPressure, avgPressure;
-        float downSize, upSize, avgSize;
-        float centerX, centerY;
-        float tapX, tapY;
-        float distFromCenterPx;
-        long interTapMs;
-        int downPointers, upPointers;
-
-        static TapFeatures fromUp(TapCapture d, MotionEvent up, View keyView, String logicalCode,
-                                  int userId, long prevEndTimeMs) {
-            TapFeatures f = new TapFeatures();
-            f.userId = userId;
-            f.key = logicalCode;
-            f.startTimeMs = d.downTimeMs;
-            f.endTimeMs = up.getEventTime();
-            f.durationMs = Math.max(0, f.endTimeMs - f.startTimeMs);
-
-            f.downPressure = d.downPressure;
-            f.upPressure = up.getPressure();
-            f.avgPressure = (f.downPressure + f.upPressure) / 2f;
-
-            f.downSize = d.downSize;
-            f.upSize = up.getSize();
-            f.avgSize = (f.downSize + f.upSize) / 2f;
-
-            int[] loc = new int[2];
-            keyView.getLocationOnScreen(loc);
-            float keyLeft = loc[0];
-            float keyTop  = loc[1];
-            float keyCx = keyLeft + keyView.getWidth() / 2f;
-            float keyCy = keyTop  + keyView.getHeight() / 2f;
-            f.centerX = keyCx;
-            f.centerY = keyCy;
-
-            float upX = keyLeft + up.getX();
-            float upY = keyTop  + up.getY();
-            f.tapX = upX;
-            f.tapY = upY;
-
-            float dx = f.tapX - f.centerX;
-            float dy = f.tapY - f.centerY;
-            f.distFromCenterPx = (float) Math.hypot(dx, dy);
-
-            f.interTapMs = (prevEndTimeMs > 0) ? (f.endTimeMs - prevEndTimeMs) : -1;
-
-            f.downPointers = d.downPointers;
-            f.upPointers = up.getPointerCount();
-
-            return f;
-        }
-    }
-
-    private static class TapModel {
-        private final ArrayList<TapFeatures> train = new ArrayList<>();
-        private boolean frozen = false;
-
-        // stats
-        private double mDur, sDur;
-        private double mPress, sPress;
-        private double mSize, sSize;
-        private double mDist, sDist;
-        private double mInter, sInter;
-
-        void addEnrollment(TapFeatures f) {
-            if (frozen) return;
-            train.add(f);
-        }
-
-        void finalizeModel() {
-            frozen = true;
-            mDur = mean(train, t -> t.durationMs);
-            mPress = mean(train, t -> t.avgPressure);
-            mSize = mean(train, t -> t.avgSize);
-            mDist = mean(train, t -> t.distFromCenterPx);
-            mInter = mean(train, t -> t.interTapMs >= 0 ? t.interTapMs : 0);
-
-            sDur = std(train, t -> t.durationMs, mDur);
-            sPress = std(train, t -> t.avgPressure, mPress);
-            sSize = std(train, t -> t.avgSize, mSize);
-            sDist = std(train, t -> t.distFromCenterPx, mDist);
-            sInter = std(train, t -> t.interTapMs >= 0 ? t.interTapMs : mInter, mInter);
-        }
-
-        boolean isGoodTap(TapFeatures f) {
-            if (!frozen || train.isEmpty()) return true;
-            final double K = 2.5;
-
-            boolean durOK   = withinK(f.durationMs, mDur, sDur, K);
-            boolean pressOK = withinK(f.avgPressure, mPress, sPress, K);
-            boolean sizeOK  = withinK(f.avgSize, mSize, sSize, K);
-            boolean distOK  = withinK(f.distFromCenterPx, mDist, sDist, K);
-            boolean interOK = f.interTapMs < 0 || withinK(f.interTapMs, mInter, sInter, K);
-
-            return durOK && pressOK && sizeOK && distOK && interOK;
-        }
-
-        private static double mean(ArrayList<TapFeatures> xs, ToDouble x) {
-            if (xs.isEmpty()) return 0;
-            double s = 0;
-            for (TapFeatures t : xs) s += x.get(t);
-            return s / xs.size();
-        }
-        private static double std(ArrayList<TapFeatures> xs, ToDouble x, double m) {
-            if (xs.size() <= 1) return 1.0;
-            double s = 0;
-            for (TapFeatures t : xs) {
-                double d = x.get(t) - m;
-                s += d * d;
-            }
-            return Math.sqrt(s / (xs.size() - 1));
-        }
-        private static boolean withinK(double v, double m, double s, double k) {
-            if (s <= 1e-6) return true;
-            return Math.abs(v - m) <= k * s;
-        }
-
-        private interface ToDouble { double get(TapFeatures t); }
-    }
 }
-

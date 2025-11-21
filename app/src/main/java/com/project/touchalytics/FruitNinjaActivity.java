@@ -141,16 +141,7 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
     public void onError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
-
-    @Override
-    public void onTapCountUpdated(long newCount) {
-        // Not used in this activity
-    }
-
-    @Override
-    public void onTapVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
-        // Not used in this activity
-    }
+    
 
     @Override
     protected void onPause() {
