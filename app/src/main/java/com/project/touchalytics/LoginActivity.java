@@ -57,10 +57,18 @@ import java.nio.charset.StandardCharsets;
 
 public class LoginActivity extends AppCompatActivity {
     private Integer receivedToken = null;
+
+    // Tracks whether Verify screen was opened from Forgot Password
+    private boolean forgotPasswordFlow = false;
+
     private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
     private TextInputLayout emailLayout, passwordLayout, confirmPasswordLayout;
     private TextInputEditText emailInput, passwordInput, confirmPasswordInput;
+    // For reset/change password screen
+    private TextInputLayout newPasswordLayout;
+    private TextInputEditText newPasswordInput;
+
     private MaterialButton primaryButton;
     private TextView forgotPasswordLink, createAccountLink, loginRedirectLink, privacyNote;
 
@@ -126,11 +134,17 @@ public class LoginActivity extends AppCompatActivity {
         makePrivacySpan(privacyNote);
 
         createAccountLink.setOnClickListener(v -> showRegisterScreen(""));
-        forgotPasswordLink.setOnClickListener(v ->
-                Snackbar.make(v, "Forgot password tapped", Snackbar.LENGTH_SHORT).show());
+        forgotPasswordLink.setOnClickListener(v -> showForgotPassScreen());
     }
 
     private void login() {
+
+        // Reset flow / pending data when returning “home”
+        forgotPasswordFlow = false;
+        pendingEmail = null;
+        pendingPass = null;
+        receivedToken = null;
+
         // clear old errors
         emailLayout.setError(null);
         passwordLayout.setError(null);
@@ -177,7 +191,8 @@ public class LoginActivity extends AppCompatActivity {
         if (hasError) return;
 
         // Call server to CHECK credentials
-        sendLoginCredentialsToServer(email, password);
+        sendCredentialsToServer("CHECK", email, password);
+
     }
 
     // -------------------- REGISTER --------------------
@@ -271,22 +286,28 @@ public class LoginActivity extends AppCompatActivity {
             pendingPass = password;
 
             // Now actually contact the server to check + send email
-            // Now actually contact the server to check + send email
-            sendEmailToServer(pendingEmail, new EmailStatusCallback() {
+            sendEmailToServer(pendingEmail, "dne", new EmailStatusCallback() {
+
                 @Override
                 public void onResult(String status, JSONObject json) {
                     if ("exists".equals(status)) {
                         // Email already registered
                         showRegisterScreen("Error: Email already in use");
-                    } else if ("ok".equals(status)) {
-                        // New email, token sent – go to Verify screen
-                        receivedToken = json.optInt("token", 0);
-                        Snackbar.make(primaryButton,
-                                "Verification code sent to " + pendingEmail,
-                                Snackbar.LENGTH_LONG
-                        ).show();
-                        showVerifyScreen();
-                    } else {
+                    }
+                    else if ("ok".equals(status)) {
+                    // New email, token sent – go to Verify screen
+                    receivedToken = json.optInt("token", 0);
+                    Snackbar.make(primaryButton,
+                            "Verification code sent to " + pendingEmail,
+                            Snackbar.LENGTH_LONG
+                    ).show();
+
+                    // This is the normal registration flow
+                    forgotPasswordFlow = false;
+                    showVerifyScreen();
+                }
+
+                    else {
                         // DB error or unexpected response
                         showRegisterScreen("Error: Server issue, please try again.");
                     }
@@ -307,7 +328,6 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     // -------------------- VERIFY --------------------
-
     private void showVerifyScreen() {
         setContentView(R.layout.activity_verify);
 
@@ -326,7 +346,7 @@ public class LoginActivity extends AppCompatActivity {
 
         TextView changeEmailLink = findViewById(R.id.changeEmailLink);
 
-        // Continue -> validate 6-digit code and proceed to MainMenu
+        // Continue -> validate 6-digit code
         primaryButton.setOnClickListener(v -> {
             codeLayout.setError(null);
             String code = codeInput.getText() == null ? "" : codeInput.getText().toString().trim();
@@ -335,20 +355,52 @@ public class LoginActivity extends AppCompatActivity {
                 codeLayout.setError("Enter the 6-digit code");
                 return;
             } else if (code.equals(String.valueOf(receivedToken))) {
-                Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
-                startActivity(new Intent(this, MainMenuActivity.class));
-                sendNewCredentialsToServer(pendingEmail,pendingPass);
-            }
-            else
-            {
-                showRegisterScreen("Error: Invalid Token");
-            }
 
+                if (forgotPasswordFlow) {
+                    // ===== Forgot Password flow =====
+                    // Token verified for password reset. This is your hook to show a
+                    // “Reset Password” screen later.
+                    Snackbar.make(primaryButton,
+                            "Code verified. Please reset your password.",
+                            Snackbar.LENGTH_SHORT
+                    ).show();
+
+                    showChangePassScreen();
+
+                } else {
+                    // ===== Registration flow (existing behavior) =====
+                    Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
+                    startActivity(new Intent(this, MainMenuActivity.class));
+
+                    // Only send new credentials if we actually came from registration
+                    if (pendingEmail != null && pendingPass != null) {
+                        sendCredentialsToServer("STORE", pendingEmail, pendingPass);
+                    }
+                }
+
+            } else {
+                // Wrong code
+                if (forgotPasswordFlow) {
+                    // In forgot-password, just show an inline error; no need to bounce back to register.
+                    codeLayout.setError("Invalid code");
+                } else {
+                    // Original behavior for registration flow
+                    showRegisterScreen("Error: Invalid Token");
+                }
+            }
         });
 
+        // Change email link behavior depends on where we came from
         changeEmailLink.setOnClickListener(v -> {
-            Snackbar.make(v, "Change email", Snackbar.LENGTH_SHORT).show();
-            showRegisterScreen("");
+            if (forgotPasswordFlow) {
+                // Came from Forgot Password → go back there
+                Snackbar.make(v, "Change email", Snackbar.LENGTH_SHORT).show();
+                showForgotPassScreen();
+            } else {
+                // Came from Registration (existing behavior)
+                Snackbar.make(v, "Change email", Snackbar.LENGTH_SHORT).show();
+                showRegisterScreen("");
+            }
         });
     }
 
@@ -372,26 +424,134 @@ public class LoginActivity extends AppCompatActivity {
         submitButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String email = emailInput.getText().toString().trim();
+                emailLayout.setError(null);
+
+                String email = emailInput.getText() == null
+                        ? ""
+                        : emailInput.getText().toString().trim();
 
                 if (email.isEmpty()) {
                     emailLayout.setError("Please enter your email");
                     return;
+                } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    emailLayout.setError("Enter a valid email");
+                    return;
                 }
 
-                // TODO: Check if email exists in the database
-                boolean emailExists = true; // Dummy value for now
+                // Save email so verify screen can display it
+                pendingEmail = email;
 
-                if (emailExists) {
+                // Reuse the same server call, but with different behavior:
+                // For forgot password, we WANT "exists" (account already registered).
+                sendEmailToServer(email, "exists", new EmailStatusCallback() {
 
-                // TODO: SOMETHING
-                } else {
-                    emailLayout.setError("Email not found");
-                }
+                    @Override
+                    public void onResult(String status, JSONObject json) {
+                        if ("exists".equals(status)) {
+                            // Email exists: assume server sent a reset/verify token
+                            receivedToken = json.optInt("token", 0);
+
+                            Snackbar.make(submitButton,
+                                    "Verification code sent to " + email,
+                                    Snackbar.LENGTH_LONG
+                            ).show();
+
+                            // Mark that we came from Forgot Password
+                            forgotPasswordFlow = true;
+                            showVerifyScreen();
+
+                        }
+                        else if ("ok".equals(status)) {
+                            // "ok" here means email NOT found (good for registration, bad for reset)
+                            emailLayout.setError("Email not found");
+                        }
+                        else {
+                            // DB error or unexpected response
+                            Snackbar.make(submitButton,
+                                    "Error: Server issue, please try again.",
+                                    Snackbar.LENGTH_LONG
+                            ).show();
+                        }
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        Snackbar.make(submitButton,
+                                "Error: Could not contact server.",
+                                Snackbar.LENGTH_LONG
+                        ).show();
+                    }
+                });
             }
         });
     }
+    private void showChangePassScreen() {
 
+        setContentView(R.layout.activity_reset_password); // <-- keep this
+
+        setSupportActionBar(findViewById(R.id.toolbar));
+        if (getSupportActionBar() != null) getSupportActionBar().setTitle("");
+
+        // Use class fields instead of local vars
+        newPasswordLayout = findViewById(R.id.newPasswordLayout);
+        newPasswordInput  = findViewById(R.id.newPasswordInput);
+        confirmPasswordLayout = findViewById(R.id.confirmPasswordLayout);
+        confirmPasswordInput  = findViewById(R.id.confirmPasswordInput);
+        MaterialButton submitButton = findViewById(R.id.submitButton);
+
+        submitButton.setOnClickListener(v -> {
+            String newPassword = newPasswordInput.getText() == null
+                    ? ""
+                    : newPasswordInput.getText().toString().trim();
+            String confirmPassword = confirmPasswordInput.getText() == null
+                    ? ""
+                    : confirmPasswordInput.getText().toString().trim();
+
+            newPasswordLayout.setError(null);
+            confirmPasswordLayout.setError(null);
+
+            if (newPassword.isEmpty() || confirmPassword.isEmpty()) {
+                newPasswordLayout.setError("Please fill out all fields");
+                confirmPasswordLayout.setError("Please fill out all fields");
+                return;
+            }
+
+            Pattern pattern = Pattern.compile("[\\p{Punct}]");
+            Matcher matcher = pattern.matcher(newPassword);
+            boolean containsPunctuation = matcher.find();
+            boolean containsUppercase = newPassword.chars().anyMatch(Character::isUpperCase);
+            boolean containsNumber = newPassword.chars().anyMatch(Character::isDigit);
+
+            if (newPassword.length() < 8) {
+                newPasswordLayout.setError("Minimum 8 characters");
+                return;
+            } else if (!containsPunctuation) {
+                newPasswordLayout.setError("Password must contain special character!");
+                return;
+            } else if (!containsUppercase) {
+                newPasswordLayout.setError("Password must contain at least one uppercase!");
+                return;
+            } else if (!containsNumber) {
+                newPasswordLayout.setError("Password must contain at least one number!");
+                return;
+            }
+
+            if (!newPassword.equals(confirmPassword)) {
+                confirmPasswordLayout.setError("Passwords do not match");
+                return;
+            }
+
+            // pendingEmail was set in Forgot Password flow
+            if (pendingEmail == null || pendingEmail.isEmpty()) {
+                Toast.makeText(this, "Missing email context. Please restart password reset.", Toast.LENGTH_LONG).show();
+                showLoginScreen();
+                return;
+            }
+
+            // Send UPDATE to server
+            sendCredentialsToServer("UPDATE", pendingEmail, newPassword);
+        });
+    }
 
 
     // -------------------- Helpers --------------------
@@ -451,15 +611,20 @@ public class LoginActivity extends AppCompatActivity {
         void onError(Exception e);
     }
 
-    private void sendEmailToServer(String email, EmailStatusCallback callback) {
+    private void sendEmailToServer(String email, String flag, EmailStatusCallback callback) {
+        // Make the captured value effectively final
+        final String safeFlag = (flag == null || flag.isEmpty()) ? "dne" : flag;
+
         new Thread(() -> {
             try {
                 Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 
-                // Send the email as raw UTF-8
-                byte[] bytes = email.getBytes("UTF-8");
+                // Build payload: "<email>|<flag>"
+                String payload = email + "|" + safeFlag;
+
+                byte[] bytes = payload.getBytes("UTF-8");
                 dos.write(bytes);
                 dos.flush();
 
@@ -477,72 +642,20 @@ public class LoginActivity extends AppCompatActivity {
                 JSONObject json = new JSONObject(response);
                 String status = json.optString("status", "");
 
-                // Let the caller decide what to do with the status/json on the UI thread
-                runOnUiThread(() -> callback.onResult(status, json));
+                String finalStatus = status;
+                runOnUiThread(() -> callback.onResult(finalStatus, json));
 
             } catch (Exception e) {
                 e.printStackTrace();
-                // Let the caller decide how to handle errors on the UI thread
                 runOnUiThread(() -> callback.onError(e));
             }
         }).start();
     }
 
-
-    private void sendNewCredentialsToServer(String email, String password) {
+    private void sendCredentialsToServer(String action, String email, String password) {
         new Thread(() -> {
             try {
-                String hashedPassword = sha256(password);
-
-                String deviceId = android.provider.Settings.Secure.getString(
-                        getContentResolver(),
-                        android.provider.Settings.Secure.ANDROID_ID
-                );
-
-                String payload = "STORE|" + email + "|" + hashedPassword + "|" + deviceId;
-
-                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
-                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
-                DataInputStream dis = new DataInputStream(socket.getInputStream());
-
-                byte[] bytes = payload.getBytes("UTF-8");
-                dos.write(bytes);
-                dos.flush();
-
-                byte[] buffer = new byte[1024];
-                int read = dis.read(buffer);
-                String response = new String(buffer, 0, read, "UTF-8");
-                System.out.println("Server Response (STORE): " + response);
-
-                dos.close();
-                dis.close();
-                socket.close();
-
-                // Parse JSON and store userID
-                JSONObject json = new JSONObject(response);
-                String status = json.optString("status", "");
-
-                if ("stored".equals(status)) {
-                    int idFromServer = json.optInt("userID", -1);
-                    if (idFromServer != -1) {
-                        // store on the activity field
-                        userID = idFromServer;
-                        System.out.println("Stored userID in LoginActivity: " + userID);
-                    }
-                } else {
-                    System.out.println("STORE failed or returned unexpected status: " + status);
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
-    private void sendLoginCredentialsToServer(String email, String password) {
-        new Thread(() -> {
-            try {
-                // 1. Hash password with SHA-256 (same as registration)
+                // 1. Hash password with SHA-256
                 String hashedPassword = sha256(password);
 
                 // 2. Grab device ID
@@ -551,8 +664,13 @@ public class LoginActivity extends AppCompatActivity {
                         android.provider.Settings.Secure.ANDROID_ID
                 );
 
-                // 3. Build CHECK payload
-                String payload = "CHECK|" + email + "|" + hashedPassword + "|" + deviceId;
+                // 3. Normalize action and build payload: "<ACTION>|email|hash|deviceId"
+                String actionUpper = (action == null || action.isEmpty())
+                        ? "CHECK"
+                        : action.toUpperCase();
+
+                String payload = actionUpper + "|" + email + "|" + hashedPassword + "|" + deviceId;
+                System.out.println("Sending credentials payload: " + payload);
 
                 // 4. Open socket and send
                 Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
@@ -566,57 +684,118 @@ public class LoginActivity extends AppCompatActivity {
                 byte[] buffer = new byte[1024];
                 int read = dis.read(buffer);
                 String response = new String(buffer, 0, read, "UTF-8");
-                System.out.println("Server Response (CHECK): " + response);
+                System.out.println("Server Response (" + actionUpper + "): " + response);
 
                 dos.close();
                 dis.close();
                 socket.close();
 
-                // 6. Parse JSON and update UI
+                // 6. Parse JSON
                 JSONObject json = new JSONObject(response);
                 String status = json.optString("status", "");
 
                 runOnUiThread(() -> {
-                    if ("good".equals(status)) {
-                        int idFromServer = json.optInt("userID", -1);
-                        int featureCount = json.optInt("features", -1);
+                    switch (actionUpper) {
+                        case "CHECK":
+                            // Old sendLoginCredentialsToServer UI behavior
+                            if ("good".equals(status)) {
+                                int idFromServer = json.optInt("userID", -1);
+                                int featureCount = json.optInt("features", -1);
 
-                        // store in class fields
-                        userID = idFromServer;
-                        swipeCount = featureCount;
+                                // store in class fields
+                                userID = idFromServer;
+                                swipeCount = featureCount;
 
-                        // PRINT THEM SO YOU CAN VERIFY
-                        System.out.println("Parsed userID from server: " + userID);
-                        System.out.println("Parsed swipeCount from server: " + swipeCount);
+                                System.out.println("Parsed userID from server: " + userID);
+                                System.out.println("Parsed swipeCount from server: " + swipeCount);
 
-                        Snackbar.make(primaryButton, "Login successful", Snackbar.LENGTH_SHORT).show();
+                                Snackbar.make(primaryButton, "Login successful", Snackbar.LENGTH_SHORT).show();
 
-                        Intent intent = new Intent(this, MainMenuActivity.class);
-                        if (userID != null) {
-                            intent.putExtra("userID", userID);
-                        }
-                        intent.putExtra("featureCount", featureCount);
-                        startActivity(intent);
-                    } else if ("error".equals(status)) {
-                        String message = json.optString("message", "Invalid email or password.");
-                        passwordLayout.setError("Invalid email or password");
-                        Snackbar.make(primaryButton, message, Snackbar.LENGTH_LONG).show();
-                    } else {
-                        Snackbar.make(primaryButton,
-                                "Unexpected server response. Please try again.",
-                                Snackbar.LENGTH_LONG
-                        ).show();
+                                Intent intent = new Intent(this, MainMenuActivity.class);
+                                if (userID != null) {
+                                    intent.putExtra("userID", userID);
+                                }
+                                intent.putExtra("featureCount", featureCount);
+                                startActivity(intent);
+                            } else if ("error".equals(status)) {
+                                String message = json.optString("message", "Invalid email or password.");
+                                passwordLayout.setError("Invalid email or password");
+                                Snackbar.make(primaryButton, message, Snackbar.LENGTH_LONG).show();
+                            } else {
+                                Snackbar.make(primaryButton,
+                                        "Unexpected server response. Please try again.",
+                                        Snackbar.LENGTH_LONG
+                                ).show();
+                            }
+                            break;
+
+                        case "STORE":
+                            // Old sendNewCredentialsToServer behavior
+                            if ("stored".equals(status)) {
+                                int idFromServer = json.optInt("userID", -1);
+                                if (idFromServer != -1) {
+                                    userID = idFromServer;
+                                    System.out.println("Stored userID in LoginActivity: " + userID);
+                                }
+                            } else {
+                                System.out.println("STORE failed or returned unexpected status: " + status);
+                            }
+                            break;
+
+                        case "UPDATE":
+                            if ("ok".equals(status)) {
+                                // Success: redirect to login
+                                Toast.makeText(this,
+                                        "Password updated. Please log in with your new password.",
+                                        Toast.LENGTH_LONG
+                                ).show();
+
+                                // Reset flow state
+                                forgotPasswordFlow = false;
+                                pendingPass = null;
+                                receivedToken = null;
+
+                                showLoginScreen();
+
+                            } else if ("error".equals(status)) {
+                                String message = json.optString("message", "Could not update password.");
+
+                                // If it's the "same password" error, show it on the current reset screen
+                                if ("Error: Cannot use most current password!".equals(message)) {
+                                    if (newPasswordLayout != null) {
+                                        newPasswordLayout.setError(message);
+                                    }
+                                    if (confirmPasswordLayout != null) {
+                                        confirmPasswordLayout.setError(message);
+                                    }
+                                } else {
+                                    // Other errors: generic toast
+                                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                                }
+
+                            } else {
+                                Toast.makeText(this,
+                                        "Unexpected server response while updating password.",
+                                        Toast.LENGTH_LONG
+                                ).show();
+                            }
+                            break;
                     }
                 });
 
             } catch (Exception e) {
                 e.printStackTrace();
-                runOnUiThread(() ->
-                        Snackbar.make(primaryButton, "Login failed: cannot reach server.", Snackbar.LENGTH_LONG).show()
-                );
+                runOnUiThread(() -> {
+                    // For CHECK we already used Snackbars; for others a Toast is fine
+                    Toast.makeText(this,
+                            "Could not reach server. Please try again.",
+                            Toast.LENGTH_LONG
+                    ).show();
+                });
             }
         }).start();
     }
+
 
 
 }
