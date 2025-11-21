@@ -56,6 +56,7 @@ public class WordleActivity extends AppCompatActivity
 
     private MainActivity touchManager;
     private int userId;
+    private boolean freeMode = false;
 
     private TextView statusMessage, statusStrokeCount, statusStrokeCountMin, statusMatchedCount, statusNotMatchedCount;
 
@@ -70,6 +71,7 @@ public class WordleActivity extends AppCompatActivity
             finish();
             return;
         }
+        freeMode = getIntent().getBooleanExtra("freeMode", false);
 
         // Initialize views before the touch manager
         statusMessage = findViewById(R.id.ta_statusMessage);
@@ -80,9 +82,59 @@ public class WordleActivity extends AppCompatActivity
 
         // Now initialize the touch manager
         touchManager = MainActivity.getInstance();
-        touchManager.initialize(this, userId, this);
 
-        updateStatusBar(touchManager.getStrokeCount(), touchManager.getMatchedCount(), touchManager.getNotMatchedCount());
+        if (freeMode) {
+            // FREE MODE: no stroke caps, no DB writes
+            touchManager.initialize(
+                    this,
+                    userId,
+                    this,
+                    0,      // minStrokes ignored in freeMode
+                    0L,     // start at 0
+                    true    // freeMode = true
+            );
+        } else {
+            // TRAINING MODE
+
+            // Total swipe count across ALL phases (if provided by LoginActivity)
+            // If launched from FruitNinja directly (no extra), default is -1 and we treat it as "start phase at 0".
+            long totalSwipeCount = getIntent().getLongExtra(MainActivity.EXTRA_STROKE_COUNT, -1L);
+
+            long initialPhaseCount;
+            if (totalSwipeCount >= 0L) {
+                // Wordle is phase 3:
+                //  - phase 1 (NewsMedia) uses the first NEWS_MEDIA_MIN_STROKE_COUNT swipes
+                //  - phase 2 (FruitNinja) uses the next FRUIT_NINJA_MIN_STROKE_COUNT swipes
+                //  - the rest (up to MIN_W_STROKE_COUNT) belong to this phase
+                long raw = totalSwipeCount
+                        - Constants.NEWS_MEDIA_MIN_STROKE_COUNT
+                        - Constants.FRUIT_NINJA_MIN_STROKE_COUNT;
+
+                initialPhaseCount = Math.max(
+                        0L,
+                        Math.min(raw, Constants.MIN_W_STROKE_COUNT)
+                );
+            } else {
+                // No global swipe count passed → start this phase at 0 strokes
+                initialPhaseCount = 0L;
+            }
+
+            touchManager.initialize(
+                    this,
+                    userId,
+                    this,
+                    Constants.MIN_W_STROKE_COUNT,
+                    initialPhaseCount,
+                    false   // freeMode = false
+            );
+        }
+
+
+        updateStatusBar(
+                touchManager.getStrokeCount(),
+                touchManager.getMatchedCount(),
+                touchManager.getNotMatchedCount()
+        );
 
         GridLayout boardGrid = findViewById(R.id.boardGrid);
 
@@ -442,29 +494,101 @@ public class WordleActivity extends AppCompatActivity
     @Override
     public void onStrokeCountUpdated(long newCount) {
         updateStatusBar(newCount, touchManager.getMatchedCount(), touchManager.getNotMatchedCount());
-        if (newCount >= Constants.MIN_STROKE_COUNT) {
+
+        if (!freeMode && newCount >= Constants.MIN_W_STROKE_COUNT) {
             showTrainingCompleteDialog();
         }
     }
 
+
     private void showTrainingCompleteDialog() {
-        SharedPreferences prefs = getSharedPreferences("training_status", MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putBoolean("training_complete", true);
-        editor.apply();
+        // Instead of blindly assuming training is done, ask the server
+        MainActivity.getInstance().fetchStoredSwipeCount(userId,
+                new MainActivity.SwipeCountCallback() {
+                    @Override
+                    public void onResult(long totalCount) {
+                        runOnUiThread(() -> handleSwipeCountResult(totalCount));
+                    }
+                    @Override
+                    public void onError(String message) {
+                        runOnUiThread(() -> {
+                            Toast.makeText(WordleActivity.this,
+                                    "Could not verify training status: " + message,
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    }
+                });
+    }
+
+
+    /**
+     * Decide where to send the user based on the total number of stored swipes.
+     *
+     * - If totalCount >= MIN_STROKE_COUNT (e.g. 90): mark training complete and go to Main Menu.
+     * - If totalCount < 90: show an error message and redirect to the correct phase
+     *   with MainActivity.EXTRA_STROKE_COUNT so that phase can top off.
+     */
+    private void handleSwipeCountResult(long totalCount) {
+        final int N1 = Constants.NEWS_MEDIA_MIN_STROKE_COUNT;      // e.g. 30
+        final int N2 = Constants.FRUIT_NINJA_MIN_STROKE_COUNT;     // e.g. 40
+        final int N3 = Constants.MIN_W_STROKE_COUNT;               // e.g. 20
+        final int TOTAL_REQUIRED = Constants.MIN_STROKE_COUNT;     // e.g. 90
+
+        if (totalCount >= TOTAL_REQUIRED) {
+            // ✅ Everything is good: mark training complete and go to main menu
+            SharedPreferences prefs = getSharedPreferences("training_status", MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putBoolean("training_complete", true);
+            editor.apply();
+
+            new AlertDialog.Builder(this)
+                    .setTitle("All Training Complete")
+                    .setMessage("You have completed all required training swipes. You can now freely explore the app.")
+                    .setPositiveButton("Go to Main Menu", (dialog, which) -> {
+                        Intent intent = new Intent(WordleActivity.this, MainMenuActivity.class);
+                        intent.putExtra("userID", userId);
+                        startActivity(intent);
+                        finish();
+                    })
+                    .setCancelable(false)
+                    .show();
+            return;
+        }
+
+        // Not enough swipes stored on server: tell the user and send them back
+        String msg = "The server reports only " + totalCount +
+                " stored training swipes, but " + TOTAL_REQUIRED +
+                " are required. We will reopen the remaining training phases.";
 
         new AlertDialog.Builder(this)
-                .setTitle("All Training Complete")
-                .setMessage("You have completed all training sessions. You can now freely explore the app.")
-                .setPositiveButton("Go to Main Menu", (dialog, which) -> {
-                    Intent intent = new Intent(WordleActivity.this, MainMenuActivity.class);
-                    intent.putExtra("userID", userId);
+                .setTitle("Training Incomplete")
+                .setMessage(msg)
+                .setPositiveButton("Continue Training", (dialog, which) -> {
+                    Intent intent;
+                    if (totalCount < N1) {
+                        // Need more NewsMedia swipes (phase 1)
+                        intent = new Intent(WordleActivity.this, NewsMediaActivity.class);
+                        intent.putExtra(NewsMediaActivity.EXTRA_USER_ID, userId);
+                    } else if (totalCount < N1 + N2) {
+                        // Need more FruitNinja swipes (phase 2)
+                        intent = new Intent(WordleActivity.this, FruitNinjaActivity.class);
+                        intent.putExtra(FruitNinjaActivity.EXTRA_USER_ID, userId);
+                    } else {
+                        // Need more Wordle swipes (phase 3)
+                        intent = new Intent(WordleActivity.this, WordleActivity.class);
+                        intent.putExtra(WordleActivity.EXTRA_USER_ID, userId);
+                    }
+
+                    // Pass the global total so that phase can compute its own initial count
+                    intent.putExtra(MainActivity.EXTRA_STROKE_COUNT, totalCount);
                     startActivity(intent);
                     finish();
                 })
                 .setCancelable(false)
                 .show();
     }
+
+
 
     @Override
     public void onVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
@@ -474,7 +598,7 @@ public class WordleActivity extends AppCompatActivity
     private void updateStatusBar(long strokeCount, int matchedCount, int notMatchedCount) {
         if (statusMessage == null) return;
 
-        if (strokeCount < Constants.MIN_STROKE_COUNT) {
+        if (strokeCount < Constants.MIN_W_STROKE_COUNT) {
             statusMessage.setText("Stroke Enrollment Phase");
             statusStrokeCount.setVisibility(View.VISIBLE);
             statusStrokeCountMin.setVisibility(View.VISIBLE);
@@ -482,8 +606,8 @@ public class WordleActivity extends AppCompatActivity
             statusNotMatchedCount.setVisibility(View.GONE);
 
             statusStrokeCount.setText(String.valueOf(strokeCount));
-            statusStrokeCountMin.setText("/" + Constants.MIN_STROKE_COUNT);
-        } else {
+            statusStrokeCountMin.setText("/" + Constants.MIN_W_STROKE_COUNT);
+        } else if (freeMode){
             statusMessage.setText("Stroke Verification Phase");
             statusStrokeCount.setVisibility(View.GONE);
             statusStrokeCountMin.setVisibility(View.GONE);
@@ -492,6 +616,13 @@ public class WordleActivity extends AppCompatActivity
 
             statusMatchedCount.setText(String.valueOf(matchedCount));
             statusNotMatchedCount.setText(String.valueOf(notMatchedCount));
+        }
+        else{
+            statusStrokeCount.setVisibility(View.GONE);
+            statusStrokeCountMin.setVisibility(View.GONE);
+            statusMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedCount.setVisibility(View.GONE);
+            statusMessage.setText("");
         }
     }
 

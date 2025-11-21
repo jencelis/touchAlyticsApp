@@ -29,6 +29,7 @@ import com.google.android.material.textfield.TextInputLayout;
 import com.project.touchalytics.data.Features;
 
 
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -76,9 +77,6 @@ public class LoginActivity extends AppCompatActivity {
     private String pendingEmail = null;
     private String pendingPass = null;
 
-    // Holds the userID and swipeCount received from the server
-    private Integer userID = null;
-    private Integer swipeCount = 0;
 
 
     @Override
@@ -370,7 +368,6 @@ public class LoginActivity extends AppCompatActivity {
                 } else {
                     // ===== Registration flow (existing behavior) =====
                     Snackbar.make(primaryButton, "Verified! Welcome.", Snackbar.LENGTH_SHORT).show();
-                    startActivity(new Intent(this, MainMenuActivity.class));
 
                     // Only send new credentials if we actually came from registration
                     if (pendingEmail != null && pendingPass != null) {
@@ -566,7 +563,6 @@ public class LoginActivity extends AppCompatActivity {
         if (start >= 0) {
             ClickableSpan click = new ClickableSpan() {
                 @Override public void onClick(@NonNull View widget) {
-                    // TODO: open privacy page/activity here (if we want, otherwise just for show)
                     Snackbar.make(widget, "Privacy Policy tapped", Snackbar.LENGTH_SHORT).show();
                 }
             };
@@ -699,24 +695,48 @@ public class LoginActivity extends AppCompatActivity {
                         case "CHECK":
                             // Old sendLoginCredentialsToServer UI behavior
                             if ("good".equals(status)) {
-                                int idFromServer = json.optInt("userID", -1);
-                                int featureCount = json.optInt("features", -1);
 
-                                // store in class fields
-                                userID = idFromServer;
-                                swipeCount = featureCount;
+                                int userID = json.optInt("userID", -1);
+                                long swipeCount = json.optInt("features", -1);
 
                                 System.out.println("Parsed userID from server: " + userID);
                                 System.out.println("Parsed swipeCount from server: " + swipeCount);
 
                                 Snackbar.make(primaryButton, "Login successful", Snackbar.LENGTH_SHORT).show();
 
-                                Intent intent = new Intent(this, MainMenuActivity.class);
-                                if (userID != null) {
-                                    intent.putExtra("userID", userID);
+                                // Decide which training phase based on TOTAL swipeCount
+                                Class<?> targetActivity;
+
+                                if (swipeCount < 30) {
+                                    // 0–29 → News Feed training
+                                    targetActivity = NewsMediaActivity.class;
+                                } else if (swipeCount < 70) {
+                                    // 30–69 → Fruit Ninja training
+                                    targetActivity = FruitNinjaActivity.class;
+                                } else if (swipeCount < 90) {
+                                    // 70–89 (or 70–90, depending how your server caps) → Wordle training
+                                    targetActivity = WordleActivity.class;
+                                } else {
+                                    targetActivity = MainMenuActivity.class;
                                 }
-                                intent.putExtra("featureCount", featureCount);
+
+                                // Build Intent to that Activity
+                                Intent intent = new Intent(LoginActivity.this, targetActivity);
+
+                                // Pass userID so each training screen can initialize MainActivity manager
+                                if (userID != -1) {
+                                    intent.putExtra(NewsMediaActivity.EXTRA_USER_ID, userID);
+                                    // If FruitNinjaActivity / WordleActivity have their own EXTRA key, you can
+                                    // also define a shared constant somewhere like "EXTRA_USER_ID".
+                                }
+
+                                // If you ever want global swipe count inside the Activity:
+                                intent.putExtra(MainActivity.EXTRA_STROKE_COUNT, swipeCount);
+
                                 startActivity(intent);
+                                finish();   // prevent back button from returning to login
+
+
                             } else if ("error".equals(status)) {
                                 String message = json.optString("message", "Invalid email or password.");
                                 passwordLayout.setError("Invalid email or password");
@@ -732,10 +752,18 @@ public class LoginActivity extends AppCompatActivity {
                         case "STORE":
                             // Old sendNewCredentialsToServer behavior
                             if ("stored".equals(status)) {
-                                int idFromServer = json.optInt("userID", -1);
-                                if (idFromServer != -1) {
-                                    userID = idFromServer;
+                                int userID = json.optInt("userID", -1);
+                                if (userID != -1) {
                                     System.out.println("Stored userID in LoginActivity: " + userID);
+
+                                    Intent intent = new Intent(this, NewsMediaActivity.class);
+
+                                    intent.putExtra("userID", userID);
+
+                                    intent.putExtra("swipeCount", 0);
+
+                                    startActivity(intent);
+                                    finish();
                                 }
                             } else {
                                 System.out.println("STORE failed or returned unexpected status: " + status);

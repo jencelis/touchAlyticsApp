@@ -5,19 +5,8 @@ import static com.project.touchalytics.Constants.SERVER_BASE_URL;
 import android.content.Context;
 import android.util.Log;
 import android.view.MotionEvent;
-import android.view.View;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-import com.google.gson.JsonObject;
 import com.project.touchalytics.data.Features;
 import com.project.touchalytics.data.Stroke;
 
@@ -26,39 +15,40 @@ import org.json.JSONObject;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
-import java.util.ArrayList;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 /**
- * Main activity of the application.
- * Handles user interaction with a WebView, collects touch data,
- * and communicates with Firebase and a backend server for enrollment and verification.
+ * Touch analytics manager (singleton, NOT an Android Activity).
+ *
+ * - Collects strokes from training UIs (NewsMediaActivity, FruitNinjaActivity, WordleActivity)
+ * - Extracts Features
+ * - Tracks per-phase strokeCount
+ * - Sends strokes to the Python server in TRAINING mode only
+ * - In FREE mode: still tracks strokes locally, but does NOT send to server
  */
 public class MainActivity {
 
-    private static final String TAG = "SocketClient";
-//    private static final String SERVER_BASE_URL = "10.128.13.109"; // <-- Replace with your PC's LAN IP
-    private static final int SERVER_PORT = 5000;
-    private TextView textView;
+    public static final String EXTRA_STROKE_COUNT = "extra_stroke_count";
 
+    private static final String TAG = "SocketClient";
+    private static final int SERVER_PORT = 7000;
 
     public static final String LOG_TAG = "TouchAnalyticsManager";
 
     private static MainActivity instance;
 
-    private DatabaseReference database;
-    private RetrofitClient.ApiService apiService;
-
     private Integer userID;
     private long strokeCount = 0L;
     private Stroke currentStroke;
 
+    // These can be wired up later using the Python response
     private int matchedCount = 0;
     private int notMatchedCount = 0;
-    private int minStrokeCount = Constants.MIN_STROKE_COUNT; // Default
+
+    // Per-phase minimum for “training complete” (e.g., 30, 40, 20)
+    private int minStrokeCount = Constants.MIN_STROKE_COUNT; // default fallback
+
+    // If true, we do NOT send strokes to the DB and we do NOT cap by minStrokeCount
+    private boolean freeMode = false;
 
     private TouchAnalyticsListener listener;
 
@@ -67,6 +57,12 @@ public class MainActivity {
         void onVerificationResult(boolean matched, int matchedCount, int notMatchedCount);
         void onError(String message);
     }
+
+    public interface SwipeCountCallback {
+        void onResult(long totalCount);
+        void onError(String message);
+    }
+
 
     private MainActivity() { }
 
@@ -77,25 +73,93 @@ public class MainActivity {
         return instance;
     }
 
+    // ----------------------------------------------------------------------
+    // Initialization overloads
+    // ----------------------------------------------------------------------
+
+    /**
+     * Legacy initializer: defaults to training-style with global MIN_STROKE_COUNT,
+     * strokeCount starts from 0, freeMode=false.
+     */
     public void initialize(Context context, int userId, TouchAnalyticsListener listener) {
-        initialize(context, userId, listener, Constants.MIN_STROKE_COUNT);
+        initialize(context, userId, listener, Constants.MIN_STROKE_COUNT, 0L, false);
     }
 
-    public void initialize(Context context, int userId, TouchAnalyticsListener listener, int minStrokes) {
+    /**
+     * Training initializer with a per-phase minStrokes cap.
+     * strokeCount starts from 0, freeMode=false.
+     */
+    public void initialize(Context context,
+                           int userId,
+                           TouchAnalyticsListener listener,
+                           int minStrokes) {
+        initialize(context, userId, listener, minStrokes, 0L, false);
+    }
+
+    /**
+     * Training initializer with explicit starting strokeCount
+     * (e.g., when resuming a phase from a server-derived total).
+     * freeMode=false.
+     */
+    public void initialize(Context context,
+                           int userId,
+                           TouchAnalyticsListener listener,
+                           int minStrokes,
+                           long initialStrokeCount) {
+        initialize(context, userId, listener, minStrokes, initialStrokeCount, false);
+    }
+
+    /**
+     * Full initializer: can be used for both TRAINING and FREE modes.
+     *
+     *  - TRAINING: freeMode=false, minStrokes = phase cap (e.g., 30/40/20)
+     *  - FREE:     freeMode=true, minStrokes is ignored (we don't cap)
+     */
+    public void initialize(Context context,
+                           int userId,
+                           TouchAnalyticsListener listener,
+                           int minStrokes,
+                           long initialStrokeCount,
+                           boolean freeMode) {
+
         this.userID = userId;
         this.listener = listener;
-        this.minStrokeCount = minStrokes;
+        this.freeMode = freeMode;
 
-        if (this.userID < 0) {
-            Toast.makeText(context, "Invalid User ID for Touch Analytics.", Toast.LENGTH_SHORT).show();
+        if (this.userID == null || this.userID < 0) {
+            Toast.makeText(context.getApplicationContext(),
+                    "Invalid User ID for Touch Analytics.",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
-        Log.i(LOG_TAG, "TouchAnalyticsManager initialized for UserID: " + userID);
 
-        FirebaseApp.initializeApp(context.getApplicationContext());
-        database = FirebaseDatabase.getInstance().getReference();
-        apiService = RetrofitClient.getClient().create(RetrofitClient.ApiService.class);
-        getFirebaseStrokeCount();
+        if (freeMode) {
+            // No training cap in free mode
+            this.minStrokeCount = Integer.MAX_VALUE;
+        } else {
+            this.minStrokeCount = minStrokes;
+        }
+
+        Log.i(LOG_TAG,
+                "TouchAnalyticsManager initialized for UserID: " + userID +
+                        " | minStrokes=" + this.minStrokeCount +
+                        " | initialStrokeCount=" + initialStrokeCount +
+                        " | freeMode=" + this.freeMode);
+
+        // Set counters
+        if (freeMode) {
+            // In free mode, pretend global training is complete
+            // so every phase sees strokeCount >= its own threshold
+            this.strokeCount = Constants.MIN_STROKE_COUNT;  // e.g. 90
+        } else {
+            this.strokeCount = initialStrokeCount;
+        }
+        this.matchedCount = 0;
+        this.notMatchedCount = 0;
+
+        if (this.listener != null) {
+            this.listener.onStrokeCountUpdated(strokeCount);
+        }
     }
 
     public void reset() {
@@ -103,6 +167,7 @@ public class MainActivity {
         matchedCount = 0;
         notMatchedCount = 0;
         minStrokeCount = Constants.MIN_STROKE_COUNT;
+        freeMode = false;
         Log.i(LOG_TAG, "TouchAnalyticsManager state has been reset.");
     }
 
@@ -118,6 +183,14 @@ public class MainActivity {
         return notMatchedCount;
     }
 
+    public boolean isFreeMode() {
+        return freeMode;
+    }
+
+    // ----------------------------------------------------------------------
+    // Touch handling
+    // ----------------------------------------------------------------------
+
     public void handleTouchEvent(MotionEvent event) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
@@ -125,11 +198,13 @@ public class MainActivity {
                 currentStroke.setStartTime(event.getEventTime());
                 currentStroke.addPointWithEvent(event);
                 break;
+
             case MotionEvent.ACTION_MOVE:
                 if (currentStroke != null) {
                     currentStroke.addPointWithEvent(event);
                 }
                 break;
+
             case MotionEvent.ACTION_UP:
                 if (currentStroke != null) {
                     currentStroke.setEndTime(event.getEventTime());
@@ -140,14 +215,24 @@ public class MainActivity {
         }
     }
 
-    private void getFirebaseStrokeCount() {
-        strokeCount = 0L;
-        if (listener != null) {
-            listener.onStrokeCountUpdated(strokeCount);
-        }
-    }
-
+    /**
+     * Build Features from the current stroke, bump the local strokeCount,
+     * notify the UI listener, and:
+     *
+     *  - TRAINING mode: send features to the Python server UNTIL the per-phase cap is reached.
+     *  - FREE mode: do NOT send to the server (no DB writes).
+     */
     private void completeStroke() {
+        if (currentStroke == null) return;
+
+        // ---- TRAINING cap: do not exceed this phase's stroke limit ----
+        if (!freeMode && strokeCount >= minStrokeCount) {
+            Log.i(LOG_TAG,
+                    "Phase stroke cap reached (" + minStrokeCount +
+                            "). Ignoring additional stroke for this phase.");
+            return; // do not build/send
+        }
+
         Features features = new Features();
 
         features.setUserID(userID);
@@ -182,62 +267,142 @@ public class MainActivity {
         features.setMaxIdleTime(currentStroke.calculateMaxIdleTime());
         features.setStraightnessRatio(currentStroke.calculateStraightnessRatio());
 
-
         Log.i(LOG_TAG, "Collected Features: " + features.toString());
 
-        if (strokeCount < minStrokeCount) {
-            Log.i(LOG_TAG, "Enrolling stroke. Adding to Firebase.");
-            database.child(String.valueOf(userID)).push().setValue(features);
+        // LOCAL progress
+        if (!freeMode) {
             strokeCount++;
-            Log.i(LOG_TAG, "New stroke count: " + strokeCount);
-
-            if (listener != null) {
-                listener.onStrokeCountUpdated(strokeCount);
-            }
+            Log.i(LOG_TAG, "New stroke count (this phase): " + strokeCount +
+                    " | freeMode=" + freeMode);
         } else {
-            Log.i(LOG_TAG, "Verifying stroke. Sending features to server.");
+            Log.i(LOG_TAG, "Free mode active: stroke count NOT incremented.");
+        }
 
+        if (listener != null) {
+            listener.onStrokeCountUpdated(strokeCount);
+        }
+
+
+        // TRAINING ONLY: send to Python
+        if (!freeMode) {
             sendToPython(features);
+        } else {
+            Log.i(LOG_TAG, "Free mode active: NOT sending features to server/DB.");
         }
     }
+
+
+    /**
+     * Ask the Python server how many strokes are currently stored for this user.
+     *
+     * Protocol (simple):
+     *   Request:  "FCOUNT|<userID>"
+     *   Response: "<totalCount>"   (e.g. "87" or "90")
+     *
+     * NOTE: callback is invoked from the background thread.
+     *       Activities should wrap it in runOnUiThread().
+     */
+    public void fetchStoredSwipeCount(int userId, SwipeCountCallback callback) {
+        new Thread(() -> {
+
+            try {
+                // Small delay to let any in-flight FSTORE inserts finish
+                Thread.sleep(300);  // 300 ms is usually enough; tweak if needed
+            } catch (InterruptedException ignored) {
+            }
+            try {
+                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+
+                // Build and send: FCOUNT|<userID>
+                String payload = "FCOUNT|" + userId;
+                byte[] bytes = payload.getBytes("UTF-8");
+                dos.write(bytes);
+                dos.flush();
+
+                // Read response: plain number as text
+                byte[] buffer = new byte[1024];
+                int read = dis.read(buffer);
+                if (read <= 0) {
+                    if (callback != null) {
+                        callback.onError("Empty response from server while fetching swipe count.");
+                    }
+                } else {
+                    String response = new String(buffer, 0, read, "UTF-8").trim();
+                    Log.i(TAG, "Server Response (FCOUNT): " + response);
+                    try {
+                        long totalCount = Long.parseLong(response);
+                        if (callback != null) {
+                            callback.onResult(totalCount);
+                        }
+                    } catch (NumberFormatException nfe) {
+                        nfe.printStackTrace();
+                        if (callback != null) {
+                            callback.onError("Unexpected FCOUNT response: " + response);
+                        }
+                    }
+                }
+
+                dos.close();
+                dis.close();
+                socket.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                Log.e(TAG, "Error fetching stored swipe count from Python server", e);
+                if (callback != null) {
+                    callback.onError("Failed to contact server for swipe count.");
+                }
+            }
+        }).start();
+    }
+
+
+
     private JSONObject featuresToJSON(Features features) {
         JSONObject obj = new JSONObject();
         try {
+            // ---- EXACTLY MATCHING DB COLUMN NAMES ----
             obj.put("userID", features.getUserID());
             obj.put("strokeDuration", features.getStrokeDuration());
             obj.put("midStrokeArea", features.getMidStrokeArea());
-            obj.put("midStrokePressure", features.getMidStrokePressure());
-            obj.put("directionEndToEnd", features.getDirectionEndToEnd());
-            obj.put("averageDirection", features.getAverageDirection());
-            obj.put("averageVelocity", features.getAverageVelocity());
-            obj.put("pairwiseVelocityPercentile", features.getPairwiseVelocityPercentile());
+            obj.put("midStrokePress", features.getMidStrokePressure());
+
+            obj.put("dirEndToEnd", features.getDirectionEndToEnd());
+            obj.put("aveDir", features.getAverageDirection());
+            obj.put("aveVelo", features.getAverageVelocity());
+            obj.put("pairwiseVeloPercent", features.getPairwiseVelocityPercentile());
+
             obj.put("startX", features.getStartX());
-            obj.put("stopX", features.getStopX());
             obj.put("startY", features.getStartY());
+            obj.put("stopX", features.getStopX());
             obj.put("stopY", features.getStopY());
+
             obj.put("touchArea", features.getTouchArea());
             obj.put("maxVelo", features.getMaxVelocity());
             obj.put("minVelo", features.getMinVelocity());
-            obj.put("aveAccel", features.getAverageAcceleration());
-            obj.put("aveDecel", features.getAverageDeceleration());
+
+            obj.put("accel", features.getAverageAcceleration());
+            obj.put("decel", features.getAverageDeceleration());
+
             obj.put("trajLength", features.getTrajectoryLength());
             obj.put("curvature", features.getCurvature());
             obj.put("veloVariance", features.getVelocityVariance());
             obj.put("angleChangeRate", features.getAngleChangeRate());
+
             obj.put("maxPress", features.getMaxPressure());
             obj.put("minPress", features.getMinPressure());
             obj.put("initPress", features.getInitPressure());
             obj.put("pressChangeRate", features.getPressureChangeRate());
             obj.put("pressVariance", features.getPressureVariance());
 
+            obj.put("maxIdleTime", features.getMaxIdleTime());
+            obj.put("straightnessRatio", features.getStraightnessRatio());
 
-            //Not sure if these are implemented yet but here for later use
-
-//            obj.put("maxIdleTime", features.getMaxIdleTime());
-//            obj.put("straightnessRatio", features.getStraightnessRatio());
-//            obj.put("aveTouchArea", features.getAverageTouchArea());
-//            obj.put("xDisplacement", features.getXDisplacement());
-//            obj.put("yDisplacement", features.getYDisplacement());
+            obj.put("xDisplacement", features.getXDis());
+            obj.put("yDisplacement", features.getYDis());
+            obj.put("aveTouchArea", features.getAverageTouchArea());
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -245,6 +410,11 @@ public class MainActivity {
         return obj;
     }
 
+    /**
+     * Sends a single stroke's Features to the Python socket server on SERVER_PORT.
+     *
+     *   FSTORE|{ ...features JSON... }
+     */
     private void sendToPython(Features features) {
         new Thread(() -> {
             try {
@@ -255,17 +425,20 @@ public class MainActivity {
                 // Convert Features to JSON string
                 String jsonString = featuresToJSON(features).toString();
 
-                // Send raw UTF-8 bytes
-                byte[] bytes = jsonString.getBytes("UTF-8");
-                dos.write(bytes);  // no writeUTF()
+                // Prefix with FSTORE| so the server can route it
+                String payload = "FSTORE|" + jsonString;
+                byte[] bytes = payload.getBytes("UTF-8");
+
+                dos.write(bytes);
                 dos.flush();
 
-
-                // Read response (if your server sends one)
+                // Read response (optional)
                 byte[] buffer = new byte[1024];
                 int read = dis.read(buffer);
-                String response = new String(buffer, 0, read, "UTF-8");
-                System.out.println("Server Response: " + response);
+                if (read > 0) {
+                    String response = new String(buffer, 0, read, "UTF-8");
+                    Log.i(TAG, "Server Response (features): " + response);
+                }
 
                 dos.close();
                 dis.close();
@@ -273,7 +446,9 @@ public class MainActivity {
 
             } catch (Exception e) {
                 e.printStackTrace();
+                Log.e(TAG, "Error sending features to Python server", e);
             }
         }).start();
     }
+
 }

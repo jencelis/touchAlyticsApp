@@ -17,7 +17,6 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
 
     public static final String EXTRA_USER_ID = "userID";
     public static final String LOG_TAG = "FruitNinjaActivity";
-    private static final int FRUIT_NINJA_MIN_STROKE_COUNT = 40;
 
     private TextView statusMessage;
     private TextView statusMatchedCount;
@@ -27,6 +26,7 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
 
     private MainActivity touchManager;
     private int userID;
+    private boolean freeMode = false;
     private GameView gameView;
 
     @Override
@@ -46,6 +46,7 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
             return;
         }
 
+        freeMode = getIntent().getBooleanExtra("freeMode", false);
         Log.i(LOG_TAG, "Logged In as UserID: " + userID);
 
         // Initialize views before the touch manager
@@ -58,9 +59,54 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
 
         // Now initialize the touch manager
         touchManager = MainActivity.getInstance();
-        touchManager.initialize(this, userID, this, FRUIT_NINJA_MIN_STROKE_COUNT);
 
-        updateStatusBar(touchManager.getStrokeCount(), touchManager.getMatchedCount(), touchManager.getNotMatchedCount());
+        if (freeMode) {
+            // FREE MODE: no stroke caps, no DB writes
+            touchManager.initialize(
+                    this,
+                    userID,
+                    this,
+                    0,      // minStrokes ignored in free mode
+                    0L,     // start at 0
+                    true    // freeMode = true
+            );
+        } else {
+            // TRAINING MODE
+
+            // Total swipe count across ALL phases (if provided by LoginActivity)
+            // If launched from NewsMedia directly (no extra), default is -1 and we treat it as "start phase at 0".
+            long totalSwipeCount = getIntent().getLongExtra(MainActivity.EXTRA_STROKE_COUNT, -1L);
+
+            long initialPhaseCount;
+            if (totalSwipeCount >= 0L) {
+                // Fruit Ninja is phase 2:
+                //  - phase 1 (NewsMedia) uses the first NEWS_MEDIA_MIN_STROKE_COUNT swipes
+                //  - the rest (up to FRUIT_NINJA_MIN_STROKE_COUNT) belong to this phase
+                long raw = totalSwipeCount - Constants.NEWS_MEDIA_MIN_STROKE_COUNT; // subtract 30
+
+                initialPhaseCount = Math.max(
+                        0L,
+                        Math.min(raw, Constants.FRUIT_NINJA_MIN_STROKE_COUNT)
+                );
+            } else {
+                // No global swipe count passed → start this phase at 0 strokes
+                initialPhaseCount = 0L;
+            }
+
+            touchManager.initialize(
+                    this,
+                    userID,
+                    this,
+                    Constants.FRUIT_NINJA_MIN_STROKE_COUNT,
+                    initialPhaseCount,
+                    false   // freeMode = false
+            );
+        }
+
+
+        updateStatusBar(touchManager.getStrokeCount(),
+                touchManager.getMatchedCount(),
+                touchManager.getNotMatchedCount());
 
         gameView.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_UP) {
@@ -86,17 +132,17 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
 
     @SuppressLint("SetTextI18n")
     private void updateStatusBar(long strokeCount, int matchedCount, int notMatchedCount) {
-        if (strokeCount < FRUIT_NINJA_MIN_STROKE_COUNT) { // Enrollment
+        if (strokeCount < Constants.FRUIT_NINJA_MIN_STROKE_COUNT) { // Enrollment
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
             statusStrokeCount.setVisibility(View.VISIBLE);
             statusStrokeCountMin.setVisibility(View.VISIBLE);
 
             statusMessage.setText("Swipe Enrollment Phase");
-            statusStrokeCountMin.setText("/" + FRUIT_NINJA_MIN_STROKE_COUNT);
+            statusStrokeCountMin.setText("/" + Constants.FRUIT_NINJA_MIN_STROKE_COUNT);
             statusStrokeCount.setText(String.valueOf(strokeCount));
 
-        } else { // Verification
+        } else if (freeMode) { // Verification
             statusStrokeCount.setVisibility(View.GONE);
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.VISIBLE);
@@ -106,15 +152,24 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
             statusMatchedCount.setText(String.valueOf(matchedCount));
             statusNotMatchedCount.setText(String.valueOf(notMatchedCount));
         }
+        else{
+            statusStrokeCount.setVisibility(View.GONE);
+            statusStrokeCountMin.setVisibility(View.GONE);
+            statusMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedCount.setVisibility(View.GONE);
+            statusMessage.setText("");
+        }
     }
 
     @Override
     public void onStrokeCountUpdated(long newCount) {
         updateStatusBar(newCount, touchManager.getMatchedCount(), touchManager.getNotMatchedCount());
-        if (newCount >= FRUIT_NINJA_MIN_STROKE_COUNT) {
+
+        if (!freeMode && newCount >= Constants.FRUIT_NINJA_MIN_STROKE_COUNT) {
             showTrainingCompleteDialog();
         }
     }
+
 
     private void showTrainingCompleteDialog() {
         new AlertDialog.Builder(this)

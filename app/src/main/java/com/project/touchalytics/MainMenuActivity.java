@@ -23,18 +23,21 @@ public class MainMenuActivity extends AppCompatActivity {
         cardNews.setOnClickListener(v -> {
             Intent intent = new Intent(this, NewsMediaActivity.class);
             intent.putExtra("userID", userID);
+            intent.putExtra("freeMode", true);
             startActivity(intent);
         });
 
         cardFruit.setOnClickListener(v -> {
             Intent intent = new Intent(this, FruitNinjaActivity.class);
             intent.putExtra("userID", userID);
+            intent.putExtra("freeMode", true);
             startActivity(intent);
         });
 
         cardWordle.setOnClickListener(v -> {
             Intent intent = new Intent(this, WordleActivity.class);
             intent.putExtra("userID", userID);
+            intent.putExtra("freeMode", true);
             startActivity(intent);
         });
     }

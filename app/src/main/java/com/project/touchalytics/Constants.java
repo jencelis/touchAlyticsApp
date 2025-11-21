@@ -20,10 +20,18 @@ public class Constants {
      * The minimum number of strokes required for training.
      * This should match the value in TouchalyticsServer.
      */
-    public static final Integer MIN_STROKE_COUNT = 50;
+    public static final Integer MIN_STROKE_COUNT = 90;
 
     /**
-     * The minimum number of taps required for training.
+     * The minimum number of strokes required for wordle training.
      */
-    public static final Integer MIN_TAP_COUNT = 20;
+    public static final int MIN_W_STROKE_COUNT = 20;
+    /**
+     * The minimum number of strokes required for fruit ninja training.
+     */
+    public static final int FRUIT_NINJA_MIN_STROKE_COUNT = 40;
+    /**
+     * The minimum number of strokes required for new fee training.
+     */
+    public static final int NEWS_MEDIA_MIN_STROKE_COUNT = 30;
 }

@@ -24,8 +24,6 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
     public static final String EXTRA_USER_ID = "userID";
     public static final String LOG_TAG = "NewsMediaActivity";
     private static final String DEFAULT_NEWS_URL = "https://www.clarkson.edu/news-events";
-    private static final int NEWS_MEDIA_MIN_STROKE_COUNT = 30;
-
     private FloatingActionButton fabNext;
     private FloatingActionButton fabPrevious;
 
@@ -39,6 +37,7 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
 
     private MainActivity touchManager;
     private int userID;
+    private boolean freeMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,7 +56,10 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
             return;
         }
 
-        Log.i(LOG_TAG, "Logged In as UserID: " + userID);
+        // --- READ FREE MODE FLAG HERE ---
+        freeMode = getIntent().getBooleanExtra("freeMode", false);
+        Log.i(LOG_TAG, "Logged In as UserID: " + userID + " | freeMode=" + freeMode);
+
 
         // Initialize views before the touch manager
         webView = findViewById(R.id.webView);
@@ -71,7 +73,35 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
 
         // Now initialize the touch manager
         touchManager = MainActivity.getInstance();
-        touchManager.initialize(this, userID, this, NEWS_MEDIA_MIN_STROKE_COUNT);
+
+        if (freeMode) {
+            // FREE MODE: no stroke caps, no DB writes
+            touchManager.initialize(
+                    this,
+                    userID,
+                    this,
+                    0,      // min strokes ignored in free mode
+                    0L,     // start phase at 0
+                    true    // free mode ON
+            );
+        } else {
+            // TRAINING MODE
+            long totalSwipeCount = getIntent().getLongExtra(MainActivity.EXTRA_STROKE_COUNT, 0L);
+
+            long initialPhaseCount = Math.min(
+                    totalSwipeCount,
+                    Constants.NEWS_MEDIA_MIN_STROKE_COUNT
+            );
+
+            touchManager.initialize(
+                    this,
+                    userID,
+                    this,
+                    Constants.NEWS_MEDIA_MIN_STROKE_COUNT,
+                    initialPhaseCount,
+                    false   // free mode OFF
+            );
+        }
 
         initializeWebView();
 
@@ -119,17 +149,17 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
 
     @SuppressLint("SetTextI18n")
     private void updateStatusBar(long strokeCount, int matchedCount, int notMatchedCount) {
-        if (strokeCount < NEWS_MEDIA_MIN_STROKE_COUNT) { // Enrollment
+        if (strokeCount < Constants.NEWS_MEDIA_MIN_STROKE_COUNT) { // Enrollment
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
             statusStrokeCount.setVisibility(View.VISIBLE);
             statusStrokeCountMin.setVisibility(View.VISIBLE);
 
             statusMessage.setText("Swipe Enrollment Phase");
-            statusStrokeCountMin.setText("/" + NEWS_MEDIA_MIN_STROKE_COUNT);
+            statusStrokeCountMin.setText("/" + Constants.NEWS_MEDIA_MIN_STROKE_COUNT);
             statusStrokeCount.setText(String.valueOf(strokeCount));
 
-        } else { // Verification
+        } else if (freeMode){ // Verification
             statusStrokeCount.setVisibility(View.GONE);
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.VISIBLE);
@@ -139,15 +169,24 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
             statusMatchedCount.setText(String.valueOf(matchedCount));
             statusNotMatchedCount.setText(String.valueOf(notMatchedCount));
         }
+        else{
+            statusStrokeCount.setVisibility(View.GONE);
+            statusStrokeCountMin.setVisibility(View.GONE);
+            statusMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedCount.setVisibility(View.GONE);
+            statusMessage.setText("");
+        }
     }
 
     @Override
     public void onStrokeCountUpdated(long newCount) {
         updateStatusBar(newCount, touchManager.getMatchedCount(), touchManager.getNotMatchedCount());
-        if (newCount >= NEWS_MEDIA_MIN_STROKE_COUNT) {
+
+        if (!freeMode && newCount >= Constants.NEWS_MEDIA_MIN_STROKE_COUNT) {
             showTrainingCompleteDialog();
         }
     }
+
 
     private void showTrainingCompleteDialog() {
         new AlertDialog.Builder(this)

@@ -30,6 +30,7 @@
             </intent-filter>
         </activity>
 
+
         <!-- Main Menu -->
         <activity
             android:name=".MainMenuActivity"
