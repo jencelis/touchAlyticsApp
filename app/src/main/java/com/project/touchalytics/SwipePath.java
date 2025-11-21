@@ -185,5 +185,10 @@ public class SwipePath {
         }
     }
 
+    public void clear() {
+        points.clear();
+        path.reset();
+    }
+
 
 }
