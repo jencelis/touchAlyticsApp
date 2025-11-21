@@ -487,7 +487,7 @@ public class LoginActivity extends AppCompatActivity {
     }
     private void showChangePassScreen() {
 
-        setContentView(R.layout.activity_reset_password); // <-- keep this
+        setContentView(R.layout.activity_reset_password);
 
         setSupportActionBar(findViewById(R.id.toolbar));
         if (getSupportActionBar() != null) getSupportActionBar().setTitle("");
