@@ -15,7 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class FruitNinjaActivity extends AppCompatActivity implements MainActivity.TouchAnalyticsListener {
 
-    public static final String EXTRA_USER_ID = "EXTRA_USER_ID";
+    public static final String EXTRA_USER_ID = "userID";
     public static final String LOG_TAG = "FruitNinjaActivity";
     private static final int FRUIT_NINJA_MIN_STROKE_COUNT = 40;
 
@@ -141,16 +141,7 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
     public void onError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
-
-    @Override
-    public void onTapCountUpdated(long newCount) {
-        // Not used in this activity
-    }
-
-    @Override
-    public void onTapVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
-        // Not used in this activity
-    }
+    
 
     @Override
     protected void onPause() {

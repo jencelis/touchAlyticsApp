@@ -21,7 +21,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 public class NewsMediaActivity extends AppCompatActivity implements MainActivity.TouchAnalyticsListener {
 
-    public static final String EXTRA_USER_ID = "EXTRA_USER_ID";
+    public static final String EXTRA_USER_ID = "userID";
     public static final String LOG_TAG = "NewsMediaActivity";
     private static final String DEFAULT_NEWS_URL = "https://www.clarkson.edu/news-events";
     private static final int NEWS_MEDIA_MIN_STROKE_COUNT = 30;
@@ -102,7 +102,7 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
         webSettings.setJavaScriptEnabled(true);
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon){
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
                 fabNext.setEnabled(webView.canGoForward());
                 fabPrevious.setEnabled(webView.canGoBack());
@@ -175,14 +175,5 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
     public void onError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
-
-    @Override
-    public void onTapCountUpdated(long newCount) {
-        // Not used in this activity
-    }
-
-    @Override
-    public void onTapVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {
-        // Not used in this activity
-    }
 }
+
