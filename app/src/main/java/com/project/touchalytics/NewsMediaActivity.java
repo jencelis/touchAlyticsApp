@@ -189,18 +189,77 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
 
 
     private void showTrainingCompleteDialog() {
+        // Instead of assuming phase 1 is done, confirm with the server
+        MainActivity.getInstance().fetchStoredSwipeCount(userID,
+                new MainActivity.SwipeCountCallback() {
+                    @Override
+                    public void onResult(long totalCount) {
+                        runOnUiThread(() -> handleSwipeCountResult(totalCount));
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        runOnUiThread(() -> {
+                            Toast.makeText(NewsMediaActivity.this,
+                                    "Could not verify training status: " + message,
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    }
+                });
+    }
+
+    /**
+     * Decide what to do based on the total number of stored swipes.
+     *
+     * For NewsMedia (phase 1) we only care about meeting N1:
+     *  - If totalCount >= N1: phase 1 requirement satisfied → go to FruitNinja.
+     *  - If totalCount < N1: show a message and restart NewsMedia to finish training.
+     */
+    private void handleSwipeCountResult(long totalCount) {
+        final int N1 = Constants.NEWS_MEDIA_MIN_STROKE_COUNT; // e.g. 30
+
+        if (totalCount >= N1) {
+            // ✅ Phase 1 (NewsMedia) requirement satisfied: proceed to FruitNinja
+            String msg = "Please continue with the next training phase.";
+
+            new AlertDialog.Builder(this)
+                    .setTitle("News Feed Training Complete")
+                    .setMessage(msg)
+                    .setPositiveButton("Go to Fruit Ninja", (dialog, which) -> {
+                        Intent intent = new Intent(NewsMediaActivity.this, FruitNinjaActivity.class);
+                        intent.putExtra(FruitNinjaActivity.EXTRA_USER_ID, userID);
+
+                        // Pass the global total so phase 2 can compute its own initial count
+                        intent.putExtra(MainActivity.EXTRA_STROKE_COUNT, totalCount);
+                        startActivity(intent);
+                        finish();
+                    })
+                    .setCancelable(false)
+                    .show();
+
+            return;
+        }
+
+        // Not enough swipes stored on server for this phase
+        String msg = "The server reports only " + totalCount +
+                " stored training swipes, but " + N1 +
+                " are required for the News feed training.\n\n" +
+                "You will need to redo this training phase.";
+
         new AlertDialog.Builder(this)
-                .setTitle("Training Complete")
-                .setMessage("You have completed the swipe training for this app. Please proceed to the next training session.")
-                .setPositiveButton("Proceed", (dialog, which) -> {
-                    Intent intent = new Intent(NewsMediaActivity.this, FruitNinjaActivity.class);
-                    intent.putExtra(NewsMediaActivity.EXTRA_USER_ID, userID);
-                    startActivity(intent);
+                .setTitle("News Feed Training Incomplete")
+                .setMessage(msg)
+                .setPositiveButton("Continue", (dialog, which) -> {
+                    Intent intent = getIntent();  // reuse same intent
+                    intent.putExtra(MainActivity.EXTRA_STROKE_COUNT, totalCount);
+
                     finish();
+                    startActivity(intent);
                 })
                 .setCancelable(false)
                 .show();
     }
+
 
 
     @Override

@@ -172,18 +172,79 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
 
 
     private void showTrainingCompleteDialog() {
+        // Instead of assuming phase 2 is done, confirm with the server
+        MainActivity.getInstance().fetchStoredSwipeCount(userID,
+                new MainActivity.SwipeCountCallback() {
+                    @Override
+                    public void onResult(long totalCount) {
+                        runOnUiThread(() -> handleSwipeCountResult(totalCount));
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        runOnUiThread(() -> {
+                            Toast.makeText(FruitNinjaActivity.this,
+                                    "Could not verify training status: " + message,
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    }
+                });
+    }
+
+    /**
+     * Decide what to do based on the total number of stored swipes.
+     *
+     * For FruitNinja (phase 2) we care about meeting N1 + N2:
+     *  - If totalCount >= N1+N2: phase 2 requirement satisfied → go to wordle.
+     *  - If totalCount < N1+N2: show a message and restart FruitNinja to finish training.
+     */
+    private void handleSwipeCountResult(long totalCount) {
+        final int N1 = Constants.NEWS_MEDIA_MIN_STROKE_COUNT;      // e.g. 30
+        final int N2 = Constants.FRUIT_NINJA_MIN_STROKE_COUNT;     // e.g. 40
+
+        if (totalCount >= N1 + N2) {
+            // ✅ Phases 1 + 2 satisfied: proceed to Wordle
+            String msg = "Please continue with the next training phase.";
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Fruit Ninja Training Complete")
+                    .setMessage(msg)
+                    .setPositiveButton("Go to Wordle", (dialog, which) -> {
+                        Intent intent = new Intent(FruitNinjaActivity.this, WordleActivity.class);
+                        intent.putExtra(WordleActivity.EXTRA_USER_ID, userID);
+
+                        // Pass the global total so Wordle can compute its own initial count
+                        intent.putExtra(MainActivity.EXTRA_STROKE_COUNT, totalCount);
+                        startActivity(intent);
+                        finish();
+                    })
+                    .setCancelable(false)
+                    .show();
+
+            return;
+        }
+
+        // User finished NewsMedia but not FruitNinja
+        String msg = "The server reports only " + (totalCount-N1) +
+                " stored training swipes, but " + N2 +
+                " are required for the Fruit Ninja training.\n\n" +
+                "You will need to redo this training phase.";
+
+
         new AlertDialog.Builder(this)
-                .setTitle("Training Complete")
-                .setMessage("You have completed the swipe training for this app. Please proceed to the next training session.")
-                .setPositiveButton("Proceed", (dialog, which) -> {
-                    Intent intent = new Intent(FruitNinjaActivity.this, WordleActivity.class);
-                    intent.putExtra(WordleActivity.EXTRA_USER_ID, userID);
-                    startActivity(intent);
+                .setTitle("Fruit Ninja Training Incomplete")
+                .setMessage(msg)
+                .setPositiveButton("Continue", (dialog, whichBtn) -> {
+                    Intent intent = getIntent();  // reuse same intent
+                    intent.putExtra(MainActivity.EXTRA_STROKE_COUNT, totalCount);
+
                     finish();
+                    startActivity(intent);
                 })
                 .setCancelable(false)
                 .show();
     }
+
 
     @Override
     public void onVerificationResult(boolean matched, int matchedCount, int notMatchedCount) {

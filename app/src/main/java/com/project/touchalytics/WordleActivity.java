@@ -543,7 +543,7 @@ public class WordleActivity extends AppCompatActivity
 
             new AlertDialog.Builder(this)
                     .setTitle("All Training Complete")
-                    .setMessage("You have completed all required training swipes. You can now freely explore the app.")
+                    .setMessage("You have completed all required training swipes. You can now navigate freely between the apps.")
                     .setPositiveButton("Go to Main Menu", (dialog, which) -> {
                         Intent intent = new Intent(WordleActivity.this, MainMenuActivity.class);
                         intent.putExtra("userID", userId);
@@ -556,33 +556,21 @@ public class WordleActivity extends AppCompatActivity
         }
 
         // Not enough swipes stored on server: tell the user and send them back
-        String msg = "The server reports only " + totalCount +
-                " stored training swipes, but " + TOTAL_REQUIRED +
-                " are required. We will reopen the remaining training phases.";
+        String msg = "The server reports only " + (totalCount-N1-N2) +
+                " stored training swipes, but " + N3 +
+                " are required for the Wordle training.\n\n" +
+                "You will need to redo this training phase.";
 
         new AlertDialog.Builder(this)
-                .setTitle("Training Incomplete")
+                .setTitle("Wordle Training Incomplete")
                 .setMessage(msg)
-                .setPositiveButton("Continue Training", (dialog, which) -> {
-                    Intent intent;
-                    if (totalCount < N1) {
-                        // Need more NewsMedia swipes (phase 1)
-                        intent = new Intent(WordleActivity.this, NewsMediaActivity.class);
-                        intent.putExtra(NewsMediaActivity.EXTRA_USER_ID, userId);
-                    } else if (totalCount < N1 + N2) {
-                        // Need more FruitNinja swipes (phase 2)
-                        intent = new Intent(WordleActivity.this, FruitNinjaActivity.class);
-                        intent.putExtra(FruitNinjaActivity.EXTRA_USER_ID, userId);
-                    } else {
-                        // Need more Wordle swipes (phase 3)
-                        intent = new Intent(WordleActivity.this, WordleActivity.class);
-                        intent.putExtra(WordleActivity.EXTRA_USER_ID, userId);
-                    }
-
-                    // Pass the global total so that phase can compute its own initial count
+                .setPositiveButton("Continue", (dialog, which) -> {
+                    Intent intent = getIntent();  // reuse same intent
                     intent.putExtra(MainActivity.EXTRA_STROKE_COUNT, totalCount);
-                    startActivity(intent);
+
                     finish();
+                    startActivity(intent);
+
                 })
                 .setCancelable(false)
                 .show();
