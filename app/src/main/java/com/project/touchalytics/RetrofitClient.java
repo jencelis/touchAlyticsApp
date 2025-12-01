@@ -45,7 +45,8 @@ public class RetrofitClient {
          * @return A Retrofit {@link Call} object for the API request, expecting a {@link JsonObject} response.
          */
         @POST("/authenticate/{userID}")
-        Call<JsonObject> sendFeatures(@Path("userID") int userID, @Body Features features);
+        Call<JsonObject> sendFeatures(@Path("userID") int userID, @Body JsonObject featuresJson);
+
     }
 
 }

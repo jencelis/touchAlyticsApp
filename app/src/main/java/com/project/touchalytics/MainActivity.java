@@ -16,6 +16,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
 
+import com.google.gson.JsonObject;
+import com.project.touchalytics.RetrofitClient;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+
 /**
  * Touch analytics manager (singleton, NOT an Android Activity).
  *
@@ -30,8 +38,8 @@ public class MainActivity {
     public static final String EXTRA_STROKE_COUNT = "extra_stroke_count";
 
     private static final String TAG = "SocketClient";
-    private static final int SERVER_PORT = 7000;
-
+    private static final int SERVER_PORT = 7000; // socket port
+    private static final int AUTH_SERVER_PORT = 5000; // Flask app port
     public static final String LOG_TAG = "TouchAnalyticsManager";
 
     private static MainActivity instance;
@@ -288,6 +296,7 @@ public class MainActivity {
             sendToPython(features);
         } else {
             Log.i(LOG_TAG, "Free mode active: NOT sending features to server/DB.");
+            sendForAuthentication(features);
         }
     }
 
@@ -450,5 +459,119 @@ public class MainActivity {
             }
         }).start();
     }
+
+    private void sendForAuthentication(Features features) {
+
+        // Build JSON using DB column / REQUIRED_FEATURES names
+        JsonObject payload = new JsonObject();
+
+        payload.addProperty("userID", features.getUserID());
+        payload.addProperty("strokeDuration", features.getStrokeDuration());
+        payload.addProperty("midStrokeArea", features.getMidStrokeArea());
+        payload.addProperty("midStrokePress", features.getMidStrokePressure());
+
+        payload.addProperty("dirEndToEnd", features.getDirectionEndToEnd());
+        payload.addProperty("aveDir", features.getAverageDirection());
+        payload.addProperty("aveVelo", features.getAverageVelocity());
+        payload.addProperty("pairwiseVeloPercent", features.getPairwiseVelocityPercentile());
+
+        payload.addProperty("startX", features.getStartX());
+        payload.addProperty("startY", features.getStartY());
+        payload.addProperty("stopX", features.getStopX());
+        payload.addProperty("stopY", features.getStopY());
+
+        payload.addProperty("touchArea", features.getTouchArea());
+        payload.addProperty("maxVelo", features.getMaxVelocity());
+        payload.addProperty("minVelo", features.getMinVelocity());
+
+        payload.addProperty("accel", features.getAverageAcceleration());
+        payload.addProperty("decel", features.getAverageDeceleration());
+
+        payload.addProperty("trajLength", features.getTrajectoryLength());
+        payload.addProperty("curvature", features.getCurvature());
+        payload.addProperty("veloVariance", features.getVelocityVariance());
+        payload.addProperty("angleChangeRate", features.getAngleChangeRate());
+
+        payload.addProperty("maxPress", features.getMaxPressure());
+        payload.addProperty("minPress", features.getMinPressure());
+        payload.addProperty("initPress", features.getInitPressure());
+        payload.addProperty("pressChangeRate", features.getPressureChangeRate());
+        payload.addProperty("pressVariance", features.getPressureVariance());
+
+        payload.addProperty("maxIdleTime", features.getMaxIdleTime());
+        payload.addProperty("straightnessRatio", features.getStraightnessRatio());
+
+        payload.addProperty("xDisplacement", features.getXDis());
+        payload.addProperty("yDisplacement", features.getYDis());
+        payload.addProperty("aveTouchArea", features.getAverageTouchArea());
+
+        Log.i(TAG, "Auth request JSON (Retrofit): " + payload.toString());
+
+        RetrofitClient.ApiService apiService =
+                RetrofitClient.getClient().create(RetrofitClient.ApiService.class);
+
+        Call<JsonObject> call = apiService.sendFeatures(features.getUserID(), payload);
+
+        call.enqueue(new Callback<JsonObject>() {
+            @Override
+            public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                boolean matched = false;
+                String message = "No message";
+
+                if (response.isSuccessful() && response.body() != null) {
+                    JsonObject json = response.body();
+
+                    if (json.has("match")) {
+                        matched = "true".equalsIgnoreCase(json.get("match").getAsString());
+                    }
+                    if (json.has("message")) {
+                        message = json.get("message").getAsString();
+                    }
+                } else {
+                    matched = false;
+                    try {
+                        if (response.errorBody() != null) {
+                            String err = response.errorBody().string();
+                            Log.w(TAG, "Auth error body: " + err);
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to read error body", e);
+                    }
+                    message = "HTTP " + response.code() + " during auth";
+                }
+
+                // Update counters
+                if (matched) {
+                    matchedCount++;
+                } else {
+                    notMatchedCount++;
+                }
+
+                Log.i(TAG, "Auth result: matched=" + matched +
+                        " | matchedCount=" + matchedCount +
+                        " | notMatchedCount=" + notMatchedCount +
+                        " | message=" + message);
+
+                if (listener != null) {
+                    // Retrofit callbacks are on main thread → safe for UI
+                    listener.onVerificationResult(matched, matchedCount, notMatchedCount);
+
+                    if (!matched && response.code() >= 500) {
+                        listener.onError("Server error during verification: " + message);
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<JsonObject> call, Throwable t) {
+                Log.e(TAG, "Retrofit authentication failed", t);
+                if (listener != null) {
+                    listener.onError("Failed to contact authentication server.");
+                }
+            }
+        });
+    }
+
+
 
 }
