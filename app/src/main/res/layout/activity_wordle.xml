@@ -42,6 +42,15 @@
             android:textColor="@android:color/white"
             tools:text="/20" />
 
+        <!-- Green Checkmark Icon -->
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="12dp"
+            android:src="@drawable/ic_checkmark"
+            app:tint="@android:color/holo_green_light"
+            android:contentDescription="Matched" />
+
         <TextView
             android:id="@+id/ta_statusMatchedCount"
             android:layout_width="wrap_content"
@@ -49,6 +58,14 @@
             android:layout_marginStart="8dp"
             android:textColor="@android:color/holo_green_light"
             tools:text="5" />
+
+        <!-- Red Cross Icon -->
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="12dp"
+            android:src="@drawable/ic_cross"
+            android:contentDescription="Not Matched" />
 
         <TextView
             android:id="@+id/ta_statusNotMatchedCount"
