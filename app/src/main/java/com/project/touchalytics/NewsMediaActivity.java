@@ -11,6 +11,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.TextView;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -32,6 +33,9 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
     private TextView statusNotMatchedCount;
     private TextView statusStrokeCount;
     private TextView statusStrokeCountMin;
+
+    private ImageView statusMatchedSym;
+    private ImageView statusNotMatchedSym;
 
     private WebView webView;
 
@@ -68,6 +72,8 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
         statusNotMatchedCount = findViewById(R.id.statusNotMatchedCount);
         statusStrokeCount = findViewById(R.id.statusStrokeCount);
         statusStrokeCountMin = findViewById(R.id.statusStrokeCountMin);
+        statusMatchedSym = findViewById(R.id.statusMatchedSym);
+        statusNotMatchedSym = findViewById(R.id.statusNotMatchedSym);
         fabNext = findViewById(R.id.fabNext);
         fabPrevious = findViewById(R.id.fabPrevious);
 
@@ -152,6 +158,8 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
         if (strokeCount < Constants.NEWS_MEDIA_MIN_STROKE_COUNT) { // Enrollment
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedSym.setVisibility(View.GONE);
+            statusMatchedSym.setVisibility(View.GONE);
             statusStrokeCount.setVisibility(View.VISIBLE);
             statusStrokeCountMin.setVisibility(View.VISIBLE);
 
@@ -164,6 +172,8 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.VISIBLE);
             statusNotMatchedCount.setVisibility(View.VISIBLE);
+            statusNotMatchedSym.setVisibility(View.VISIBLE);
+            statusMatchedSym.setVisibility(View.VISIBLE);
 
             statusMessage.setText("Swipe Verification Phase");
             statusMatchedCount.setText(String.valueOf(matchedCount));
@@ -174,6 +184,8 @@ public class NewsMediaActivity extends AppCompatActivity implements MainActivity
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedSym.setVisibility(View.GONE);
+            statusMatchedSym.setVisibility(View.GONE);
             statusMessage.setText("");
         }
     }

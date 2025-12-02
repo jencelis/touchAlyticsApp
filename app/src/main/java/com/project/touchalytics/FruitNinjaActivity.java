@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,7 +24,8 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
     private TextView statusNotMatchedCount;
     private TextView statusStrokeCount;
     private TextView statusStrokeCountMin;
-
+    private ImageView statusMatchedSym;
+    private ImageView statusNotMatchedSym;
     private MainActivity touchManager;
     private int userID;
     private boolean freeMode = false;
@@ -55,6 +57,8 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
         statusNotMatchedCount = findViewById(R.id.statusNotMatchedCount);
         statusStrokeCount = findViewById(R.id.statusStrokeCount);
         statusStrokeCountMin = findViewById(R.id.statusStrokeCountMin);
+        statusMatchedSym = findViewById(R.id.statusMatchedSym);
+        statusNotMatchedSym = findViewById(R.id.statusNotMatchedSym);
         gameView = findViewById(R.id.game_view);
 
         // Now initialize the touch manager
@@ -135,6 +139,8 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
         if (strokeCount < Constants.FRUIT_NINJA_MIN_STROKE_COUNT) { // Enrollment
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedSym.setVisibility(View.GONE);
+            statusMatchedSym.setVisibility(View.GONE);
             statusStrokeCount.setVisibility(View.VISIBLE);
             statusStrokeCountMin.setVisibility(View.VISIBLE);
 
@@ -147,6 +153,8 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.VISIBLE);
             statusNotMatchedCount.setVisibility(View.VISIBLE);
+            statusNotMatchedSym.setVisibility(View.VISIBLE);
+            statusMatchedSym.setVisibility(View.VISIBLE);
 
             statusMessage.setText("Swipe Verification Phase");
             statusMatchedCount.setText(String.valueOf(matchedCount));
@@ -157,6 +165,8 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedSym.setVisibility(View.GONE);
+            statusMatchedSym.setVisibility(View.GONE);
             statusMessage.setText("");
         }
     }

@@ -16,6 +16,7 @@ import android.view.textservice.TextInfo;
 import android.view.textservice.TextServicesManager;
 import android.widget.Button;
 import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Space;
 import android.widget.TextView;
@@ -60,6 +61,9 @@ public class WordleActivity extends AppCompatActivity
 
     private TextView statusMessage, statusStrokeCount, statusStrokeCountMin, statusMatchedCount, statusNotMatchedCount;
 
+    private ImageView statusMatchedSym;
+    private ImageView statusNotMatchedSym;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -79,6 +83,8 @@ public class WordleActivity extends AppCompatActivity
         statusStrokeCountMin = findViewById(R.id.ta_statusTapCountMin);
         statusMatchedCount = findViewById(R.id.ta_statusMatchedCount);
         statusNotMatchedCount = findViewById(R.id.ta_statusNotMatchedCount);
+        statusMatchedSym = findViewById(R.id.statusMatchedSym);
+        statusNotMatchedSym = findViewById(R.id.statusNotMatchedSym);
 
         // Now initialize the touch manager
         touchManager = MainActivity.getInstance();
@@ -592,6 +598,8 @@ public class WordleActivity extends AppCompatActivity
             statusStrokeCountMin.setVisibility(View.VISIBLE);
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedSym.setVisibility(View.GONE);
+            statusMatchedSym.setVisibility(View.GONE);
 
             statusStrokeCount.setText(String.valueOf(strokeCount));
             statusStrokeCountMin.setText("/" + Constants.MIN_W_STROKE_COUNT);
@@ -601,6 +609,8 @@ public class WordleActivity extends AppCompatActivity
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.VISIBLE);
             statusNotMatchedCount.setVisibility(View.VISIBLE);
+            statusNotMatchedSym.setVisibility(View.VISIBLE);
+            statusMatchedSym.setVisibility(View.VISIBLE);
 
             statusMatchedCount.setText(String.valueOf(matchedCount));
             statusNotMatchedCount.setText(String.valueOf(notMatchedCount));
@@ -610,6 +620,8 @@ public class WordleActivity extends AppCompatActivity
             statusStrokeCountMin.setVisibility(View.GONE);
             statusMatchedCount.setVisibility(View.GONE);
             statusNotMatchedCount.setVisibility(View.GONE);
+            statusNotMatchedSym.setVisibility(View.GONE);
+            statusMatchedSym.setVisibility(View.GONE);
             statusMessage.setText("");
         }
     }

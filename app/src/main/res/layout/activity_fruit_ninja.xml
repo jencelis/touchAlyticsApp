@@ -43,6 +43,7 @@
 
         <!-- Green Checkmark Icon -->
         <ImageView
+            android:id="@+id/statusMatchedSym"
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:layout_marginStart="12dp"
@@ -60,6 +61,7 @@
 
         <!-- Red Cross Icon -->
         <ImageView
+            android:id="@+id/statusNotMatchedSym"
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:layout_marginStart="12dp"
