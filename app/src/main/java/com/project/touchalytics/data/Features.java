@@ -14,7 +14,8 @@ public class Features {
     private float initPressure; // Initial pressure recorded
     private float pressureChangeRate; // pressure change frequency
     private float pressureVariance; // pressure variance
-    private float touchArea; // average pixel contact area (px^2)
+    private float averageTouchArea; // average pixel contact area (px^2)
+    private float touchArea; // total pixel contact area (px^2)
     private float directionEndToEnd;
     private float averageDirection;
     private float averageVelocity;
@@ -26,12 +27,15 @@ public class Features {
     private float stopX;
     private float startY;
     private float stopY;
+    private float xdis;     // X axis displacement
+    private float ydis;     // Y axis displacement
     private float averageAcceleration; // average positive acceleration (pixels/ms^2)
     private float averageDeceleration; // average deceleration magnitude (pixels/ms^2)
     private float trajectoryLength; // total distance traveled along stroke path (pixels)
     private float curvature; // average deviation from straight line (pixels)
     private float angleChangeRate; // direction change frequency (changes/s)
-
+    private float maxIdleTime;  // max idle time (ms)
+    private float straightnessRatio;    // straightness ratio
     /**
      * Default constructor for Features.
      */
@@ -182,19 +186,35 @@ public class Features {
     }
 
     /**
-     * Gets the average touch contact area in pixels^2.
-     * @return The average touch contact area (px^2).
+     * Gets the total touch contact area in pixels^2.
+     * @return The total touch contact area (px^2).
      */
     public float getTouchArea() {
         return touchArea;
     }
 
     /**
-     * Sets the average touch contact area in pixels^2.
-     * @param touchArea The average touch contact area (px^2).
+     * Sets the total touch contact area in pixels^2.
+     * @param touchArea The total touch contact area (px^2).
      */
     public void setTouchArea(float touchArea) {
         this.touchArea = touchArea;
+    }
+
+    /**
+     * Gets the average touch contact area in pixels^2.
+     * @return The average touch contact area (px^2).
+     */
+    public float getAverageTouchArea() {
+        return averageTouchArea;
+    }
+
+    /**
+     * Sets the average touch contact area in pixels^2.
+     * @param averageTouchArea The average touch contact area (px^2).
+     */
+    public void setAverageTouchArea(float averageTouchArea) {
+        this.averageTouchArea = averageTouchArea;
     }
 
     /**
@@ -360,6 +380,38 @@ public class Features {
     }
 
     /**
+     * Gets the starting X-coordinate displacement of the stroke.
+     * @return The x axis displacement.
+     */
+    public float getXDis() {
+        return xdis;
+    }
+
+    /**
+     * Sets the starting X-coordinate displacement of the stroke.
+     * @param xDis The x axis displacement.
+     */
+    public void setXDis(float xDis) {
+        this.xdis = xDis;
+    }
+
+    /**
+     * Gets the starting Y-coordinate displacement of the stroke.
+     * @return The y axis displacement.
+     */
+    public float getYDis() {
+        return ydis;
+    }
+
+    /**
+     * Sets the starting Y-coordinate displacement of the stroke.
+     * @param yDis The y axis displacement.
+     */
+    public void setYDis(float yDis) {
+        this.ydis = yDis;
+    }
+
+    /**
      * Gets the ending Y-coordinate of the stroke.
      * @return The ending Y-coordinate.
      */
@@ -467,6 +519,40 @@ public class Features {
      */
     public void setAngleChangeRate(float angleChangeRate) {
         this.angleChangeRate = angleChangeRate;
+    }
+
+    /**
+     * Gets the maximum idle time of the stroke.
+     * Units: ms
+     * @return max idle time
+     */
+    public float getMaxIdleTime() {
+        return maxIdleTime;
+    }
+
+    /**
+     * Sets the maximum idle time of the stroke.
+     * Units: ms
+     * @param maxIdleTime The max idle time
+     */
+    public void setMaxIdleTime(float maxIdleTime) {
+        this.maxIdleTime = maxIdleTime;
+    }
+
+    /**
+     * Gets the straightness ratio of the stroke.
+     * @return the straightness ratio
+     */
+    public float getStraightnessRatio() {
+        return straightnessRatio;
+    }
+
+    /**
+     * Sets the straigtness ratio of the stroke.
+     * @param straightnessRatio The straightness ratio
+     */
+    public void setStraightnessRatio(float straightnessRatio) {
+        this.straightnessRatio = straightnessRatio;
     }
 
 }

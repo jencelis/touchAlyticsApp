@@ -131,19 +131,6 @@
                 android:layout_marginTop="12dp">
 
                 <TextView
-                    android:id="@+id/resendCodeLink"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/resend_code"
-                    android:textColor="@color/hub_primary"
-                    android:textSize="18sp"/>
-
-                <TextView
-                    android:layout_width="16dp"
-                    android:layout_height="wrap_content"
-                    android:text=""/>
-
-                <TextView
                     android:id="@+id/changeEmailLink"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -158,16 +145,17 @@
                 style="@style/Widget.Material3.Button"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
+                android:layout_marginTop="16dp"
                 android:text="@string/continue_label"
                 android:textAllCaps="false"
-                android:textStyle="bold"
                 android:textSize="20sp"
-                app:cornerRadius="20dp"
+                android:textStyle="bold"
                 app:backgroundTint="@color/hub_primary"
-                app:layout_constraintTop_toBottomOf="@id/linksRow"
-                app:layout_constraintStart_toStartOf="parent"
+                app:cornerRadius="20dp"
                 app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="20dp"/>
+                app:layout_constraintHorizontal_bias="0.0"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/linksRow" />
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>
 

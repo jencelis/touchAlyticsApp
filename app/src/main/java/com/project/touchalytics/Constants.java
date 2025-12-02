@@ -9,7 +9,7 @@ public class Constants {
      * The base URL of the server.
      * Change to the IP address and port of your TouchalyticsServer.
      */
-    public static final String SERVER_BASE_URL = "http://10.128.6.180:5000";
+    public static final String SERVER_BASE_URL = "128.153.221.6";
 
     /**
      * The URL of the home website for scrolling.
@@ -20,5 +20,18 @@ public class Constants {
      * The minimum number of strokes required for training.
      * This should match the value in TouchalyticsServer.
      */
-    public static final Integer MIN_STROKE_COUNT = 50;
+    public static final Integer MIN_STROKE_COUNT = 90;
+
+    /**
+     * The minimum number of strokes required for wordle training.
+     */
+    public static final int MIN_W_STROKE_COUNT = 20;
+    /**
+     * The minimum number of strokes required for fruit ninja training.
+     */
+    public static final int FRUIT_NINJA_MIN_STROKE_COUNT = 40;
+    /**
+     * The minimum number of strokes required for new fee training.
+     */
+    public static final int NEWS_MEDIA_MIN_STROKE_COUNT = 30;
 }

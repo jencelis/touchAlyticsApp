@@ -7,23 +7,38 @@ import com.google.android.material.card.MaterialCardView;
 
 public class MainMenuActivity extends AppCompatActivity {
 
+    private int userID;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
 
+        userID = getIntent().getIntExtra("userID", -1);
+
         MaterialCardView cardNews = findViewById(R.id.cardNews);
         MaterialCardView cardFruit = findViewById(R.id.cardFruit);
         MaterialCardView cardWordle = findViewById(R.id.cardWordle);
 
-        cardNews.setOnClickListener(v ->
-                startActivity(new Intent(this, NewsMediaActivity.class)));
+        cardNews.setOnClickListener(v -> {
+            Intent intent = new Intent(this, NewsMediaActivity.class);
+            intent.putExtra("userID", userID);
+            intent.putExtra("freeMode", true);
+            startActivity(intent);
+        });
 
-        cardFruit.setOnClickListener(v ->
-                startActivity(new Intent(this, FruitNinjaActivity.class)));
+        cardFruit.setOnClickListener(v -> {
+            Intent intent = new Intent(this, FruitNinjaActivity.class);
+            intent.putExtra("userID", userID);
+            intent.putExtra("freeMode", true);
+            startActivity(intent);
+        });
 
-        cardWordle.setOnClickListener(v ->
-                startActivity(new Intent(this, WordleActivity.class)));
+        cardWordle.setOnClickListener(v -> {
+            Intent intent = new Intent(this, WordleActivity.class);
+            intent.putExtra("userID", userID);
+            intent.putExtra("freeMode", true);
+            startActivity(intent);
+        });
     }
 }
-
