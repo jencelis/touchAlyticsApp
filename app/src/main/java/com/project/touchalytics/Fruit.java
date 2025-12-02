@@ -7,6 +7,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import java.util.Random;
 
 public class Fruit {
 
@@ -15,15 +16,12 @@ public class Fruit {
     private float gravity = 0.8f;
     private int radius = 100;
     private int color;
-
     private boolean sliced = false;
     private int sliceAlpha = 255;
 
-
     public enum FruitType {
-        APPLE, BANANA, COCONUT, STARFRUIT, BOMB
+        APPLE, BANANA, COCONUT, STARFRUIT, BOMB, BROCCOLI, GOLDEN_APPLE
     }
-
 
     private FruitType type;
     private boolean isBomb = false;
@@ -33,8 +31,6 @@ public class Fruit {
     private Bitmap wholeImage;
     private Bitmap slicedImage;
     private boolean useImages = true;
-
-
 
     private static Bitmap appleWhole = null;
     private static Bitmap appleSliced = null;
@@ -46,8 +42,26 @@ public class Fruit {
     private static Bitmap starfruitSliced = null;
     private static Bitmap bombWhole = null;
     private static Bitmap bombSliced = null;
+    private static Bitmap broccoli = null;
+    private static Bitmap goldenApple = null;
+    private static Bitmap goldenAppleSliced = null;
+
     private static boolean imagesLoaded = false;
 
+    // Multi-hit tracking (for Coconut)
+    private int hitsRequired = 1;
+    private int currentHits = 0;
+    private boolean isFullySliced = false;
+    private boolean isPenalty = false;
+    private float damageLevel = 0f;
+
+
+    private long lastHitTime = 0;
+    private long hitCooldown = 300;  // 300ms cooldown between hits
+
+    private Random random = new Random();
+
+    private static int globalFrameCount = 0;
 
     // Static method to set context (call this once from GameView)
     public static void setContext(Context ctx) {
@@ -66,6 +80,19 @@ public class Fruit {
         this.color = color;
         this.type = type;
         this.isBomb = (type == FruitType.BOMB);
+
+        // Set special properties based on type
+        if(type == FruitType.COCONUT){
+            hitsRequired = 3;
+            currentHits = 0;
+            isFullySliced = false;
+        }else if (type == FruitType.BROCCOLI) {
+            isPenalty = true;
+        }else{
+            hitsRequired = 1;   // Normal fruits only need 1 hit
+            currentHits = 0;
+        }
+
 
         // Set different sizes for different fruits
         switch (type) {
@@ -113,6 +140,10 @@ public class Fruit {
                 starfruitSliced = BitmapFactory.decodeResource(context.getResources(), R.drawable.starfruit_sliced);
                 bombWhole = BitmapFactory.decodeResource(context.getResources(), R.drawable.bomb);
                 bombSliced = BitmapFactory.decodeResource(context.getResources(), R.drawable.bomb);
+                broccoli = BitmapFactory.decodeResource(context.getResources(), R.drawable.broccoli);
+                goldenApple = BitmapFactory.decodeResource(context.getResources(), R.drawable.golden);
+                goldenAppleSliced = BitmapFactory.decodeResource(context.getResources(), R.drawable.golden_sliced);
+
 
                 imagesLoaded = true;
                 System.out.println("✓ All images loaded once (static)");
@@ -144,6 +175,14 @@ public class Fruit {
             case BOMB:
                 wholeImage = bombWhole;
                 slicedImage = bombSliced;
+                break;
+            case BROCCOLI:
+                wholeImage = broccoli;
+                slicedImage = broccoli;
+                break;
+            case GOLDEN_APPLE:
+                wholeImage = goldenApple;
+                slicedImage = goldenAppleSliced;
                 break;
         }
 
@@ -179,6 +218,25 @@ public class Fruit {
 
         // Reset alpha
         paint.setAlpha(255);
+
+        if(type == FruitType.COCONUT && currentHits > 0 && currentHits < hitsRequired && !sliced){
+            // Draw crack lines
+            paint.setColor(Color.BLACK);
+            paint.setStrokeWidth(5);
+            paint.setStyle(Paint.Style.STROKE);
+
+            if (currentHits >= 1) {
+                canvas.drawLine(x, y - radius, x, y + radius, paint);
+            }
+
+            if (currentHits >= 2) {
+                canvas.drawLine(x - radius, y, x + radius, y, paint);
+            }
+
+            paint.setStyle(Paint.Style.FILL);
+
+
+        }
     }
 
     private void drawWithImages(Canvas canvas, Paint paint) {
@@ -302,4 +360,80 @@ public class Fruit {
                 return Color.RED;
         }
     }
+
+
+    /**
+     * Handles a swipe hit on this fruit
+     * @return true if the fruit should be removed (fully sliced or single-hit)
+     */
+    public boolean onSwipeHit(){
+        // Check cooldown - prevent multiple hits from same swipe
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastHitTime < hitCooldown) {
+            return false;  // Too soon after last hit
+        }
+
+        lastHitTime = currentTime;  // Update last hit time
+        currentHits++;
+
+        if(type == FruitType.COCONUT){
+            damageLevel = (float) currentHits / (float) hitsRequired;
+
+            // Check if fully sliced
+            if (currentHits >= hitsRequired){
+                isFullySliced = true;
+                return true; //remove coconut
+            }
+
+            // Not fully sliced - speed up fall slightly
+            //velocityY += 3f; //fall faster when damaged
+            return false; //don't remove yet
+        }else{
+            isFullySliced = true;
+            return true;
+        }
+    }
+
+    /**
+     * @return true if this fruit is a penalty item (broccoli)
+     */
+    public boolean isPenaltyItem() {
+            return isPenalty;
+    }
+
+    /**
+     * @return true if this fruit is a coconut
+     */
+     public boolean isCoconut() {
+         return type == FruitType.COCONUT;
+     }
+
+     /**
+     * @return Current hit count (for coconuts)
+      */
+      public int getHitCount() {
+        return currentHits;
+      }
+
+      /**
+      * @return Total hits required (for coconuts)
+      */
+      public int getHitsRequired() {
+         return hitsRequired;
+      }
+
+      /**
+      * @return Damage level from 0.0 to 1.0 (for visual effects)
+      */
+      public float getDamageLevel() {
+         return damageLevel;
+      }
+
+    /**
+     * @return true if this fruit has been fully sliced
+     */
+        public boolean isFullySliced() {
+          return isFullySliced;
+    }
+
 }

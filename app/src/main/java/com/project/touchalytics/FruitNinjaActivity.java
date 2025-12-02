@@ -263,11 +263,19 @@ public class FruitNinjaActivity extends AppCompatActivity implements MainActivit
     protected void onPause() {
         super.onPause();
         gameView.pause();
+        gameView.pauseAllMusic();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         gameView.resume();
+        gameView.resumeMusic();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        gameView.releaseResources();
     }
 }
