@@ -61,8 +61,6 @@ public class LoginActivity extends AppCompatActivity {
 
     // Tracks whether Verify screen was opened from Forgot Password
     private boolean forgotPasswordFlow = false;
-
-    private static final int SERVER_PORT = 7000;
     // Common (used per-screen)
     private TextInputLayout emailLayout, passwordLayout, confirmPasswordLayout;
     private TextInputEditText emailInput, passwordInput, confirmPasswordInput;
@@ -577,7 +575,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     public int getIntegerFromServer() throws Exception {
-        URL url = new URL("http://" + SERVER_BASE_URL + ":5000/listen");
+        URL url = new URL("http://" + SERVER_BASE_URL + ":"+Constants.AUTH_SERVER_PORT+"/listen");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
 //        conn.setConnectTimeout(5000);
@@ -613,7 +611,7 @@ public class LoginActivity extends AppCompatActivity {
 
         new Thread(() -> {
             try {
-                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                Socket socket = new Socket(SERVER_BASE_URL, Constants.SERVER_PORT);
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 
@@ -669,7 +667,7 @@ public class LoginActivity extends AppCompatActivity {
                 System.out.println("Sending credentials payload: " + payload);
 
                 // 4. Open socket and send
-                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                Socket socket = new Socket(SERVER_BASE_URL, Constants.SERVER_PORT);
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 

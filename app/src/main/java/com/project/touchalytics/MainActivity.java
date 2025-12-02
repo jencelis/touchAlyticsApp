@@ -38,8 +38,6 @@ public class MainActivity {
     public static final String EXTRA_STROKE_COUNT = "extra_stroke_count";
 
     private static final String TAG = "SocketClient";
-    private static final int SERVER_PORT = 7000; // socket port
-    private static final int AUTH_SERVER_PORT = 5000; // Flask app port
     public static final String LOG_TAG = "TouchAnalyticsManager";
 
     private static MainActivity instance;
@@ -320,7 +318,7 @@ public class MainActivity {
             } catch (InterruptedException ignored) {
             }
             try {
-                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                Socket socket = new Socket(SERVER_BASE_URL, Constants.SERVER_PORT);
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 
@@ -427,7 +425,7 @@ public class MainActivity {
     private void sendToPython(Features features) {
         new Thread(() -> {
             try {
-                Socket socket = new Socket(SERVER_BASE_URL, SERVER_PORT);
+                Socket socket = new Socket(SERVER_BASE_URL, Constants.SERVER_PORT);
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 

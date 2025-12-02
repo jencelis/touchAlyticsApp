@@ -9,8 +9,11 @@ public class Constants {
      * The base URL of the server.
      * Change to the IP address and port of your TouchalyticsServer.
      */
-    public static final String SERVER_BASE_URL = "128.153.210.205";
+    public static final String SERVER_BASE_URL = "10.128.6.180";
 
+    public static final int AUTH_SERVER_PORT = 5000; // Flask app port
+
+    public static final int SERVER_PORT = 7000; // Server db port
     /**
      * The URL of the home website for scrolling.
      */

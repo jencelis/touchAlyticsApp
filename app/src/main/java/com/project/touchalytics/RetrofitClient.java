@@ -27,7 +27,7 @@ public class RetrofitClient {
     public static Retrofit getClient() {
         if (retrofit == null) {
             retrofit = new Retrofit.Builder()
-                    .baseUrl("http://" + Constants.SERVER_BASE_URL + ":5000") // Base URL for the API
+                    .baseUrl("http://" + Constants.SERVER_BASE_URL + ":" + Constants.AUTH_SERVER_PORT) // Base URL for the API
                     .addConverterFactory(GsonConverterFactory.create()) // Convert JSON to Java object
                     .build();
         }
@@ -41,7 +41,7 @@ public class RetrofitClient {
         /**
          * Sends swipe features to the server for authentication/classification.
          * @param userID The ID of the user whose features are being sent.
-         * @param features The {@link Features} object containing the swipe data.
+         * @param featuresJson The {@link Features} object containing the swipe data.
          * @return A Retrofit {@link Call} object for the API request, expecting a {@link JsonObject} response.
          */
         @POST("/authenticate/{userID}")
