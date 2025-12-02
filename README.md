@@ -9,3 +9,7 @@ After that to connect it to the server you will need to change or verify three c
     public static final int SERVER_PORT = 7000; // Server db port
 
 Make SERVER_BASE_URL match your ip on the server side, and make sure the two ports match the ports on the server side aswell.
+
+-------------------------------------------
+
+To run the app successfully two users must be registered, when only one user is registered all swipes will be marked as bad.
