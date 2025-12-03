@@ -6,14 +6,20 @@ package com.project.touchalytics;
 public class Constants {
 
     /**
-     * The base URL of the server.
-     * Change to the IP address and port of your TouchalyticsServer.
+     * The base ip of the server.
+     * Change to the IP address of your TouchalyticsServer.
      */
-    public static final String SERVER_BASE_URL = "128.153.210.205";
-
-    public static final int AUTH_SERVER_PORT = 5000; // Flask app port
-
-    public static final int SERVER_PORT = 7000; // Server db port
+    public static final String SERVER_BASE_URL = "128.153.221.6";
+    /**
+     * The base flask port of the server.
+     * Change to the flask port of your TouchalyticsServer.
+     */
+    public static final int AUTH_SERVER_PORT = 5000;
+    /**
+     * The base socket port of the server.
+     * Change to the socket port of your TouchalyticsServer.
+     */
+    public static final int SERVER_PORT = 7000;
 
     /**
      * The minimum number of strokes required for training.

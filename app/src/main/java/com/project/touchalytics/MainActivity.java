@@ -516,7 +516,10 @@ public class MainActivity {
                 boolean matched = false;
                 String message = "No message";
 
+                int code = response.code();
+
                 if (response.isSuccessful() && response.body() != null) {
+                    // ---- Normal success path: parse JSON and count as a real decision ----
                     JsonObject json = response.body();
 
                     if (json.has("match")) {
@@ -525,40 +528,74 @@ public class MainActivity {
                     if (json.has("message")) {
                         message = json.get("message").getAsString();
                     }
-                } else {
-                    matched = false;
+
+                    // Update counters ONLY for real decisions
+                    if (matched) {
+                        matchedCount++;
+                    } else {
+                        notMatchedCount++;
+                    }
+
+                    Log.i(TAG, "Auth result: matched=" + matched +
+                            " | matchedCount=" + matchedCount +
+                            " | notMatchedCount=" + notMatchedCount +
+                            " | message=" + message);
+
+//                    if (listener != null) {
+//                        listener.onVerificationResult(matched, matchedCount, notMatchedCount);
+//                    }
+                    return;
+                }
+
+                // -------- Non-2xx responses here --------
+
+                // NEUTRAL CASE: 5xx → server/biometrics unavailable, DO NOT count as bad swipe
+                if (code >= 500) {
                     try {
                         if (response.errorBody() != null) {
                             String err = response.errorBody().string();
-                            Log.w(TAG, "Auth error body: " + err);
+                            Log.w(TAG, "Auth error body (5xx): " + err);
                         }
                     } catch (Exception e) {
-                        Log.w(TAG, "Failed to read error body", e);
+                        Log.w(TAG, "Failed to read error body for 5xx", e);
                     }
-                    message = "HTTP " + response.code() + " during auth";
+
+                    message = "Biometric server unavailable (HTTP " + code + ").";
+
+                    Log.w(TAG, "Neutral auth result (5xx). Not counting as matched/notMatched. msg=" + message);
+
+                    if (listener != null) {
+                        // Tell UI it's a server issue, but do NOT treat as a failed swipe
+                        listener.onError(message);
+                    }
+                    return;  // <-- critical: don't update counters or call onVerificationResult
                 }
 
-                // Update counters
-                if (matched) {
-                    matchedCount++;
-                } else {
-                    notMatchedCount++;
+                // REAL FAILURE CASE: 4xx and others (treated as bad swipe)
+                matched = false;
+                try {
+                    if (response.errorBody() != null) {
+                        String err = response.errorBody().string();
+                        Log.w(TAG, "Auth error body: " + err);
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to read error body", e);
                 }
+                message = "HTTP " + code + " during auth";
+
+                // Count as a real failed swipe
+                notMatchedCount++;
 
                 Log.i(TAG, "Auth result: matched=" + matched +
                         " | matchedCount=" + matchedCount +
                         " | notMatchedCount=" + notMatchedCount +
                         " | message=" + message);
 
-                if (listener != null) {
-                    // Retrofit callbacks are on main thread → safe for UI
-                    listener.onVerificationResult(matched, matchedCount, notMatchedCount);
-
-                    if (!matched && response.code() >= 500) {
-                        listener.onError("Server error during verification: " + message);
-                    }
-                }
+//                if (listener != null) {
+//                    listener.onVerificationResult(matched, matchedCount, notMatchedCount);
+//                }
             }
+
 
             @Override
             public void onFailure(Call<JsonObject> call, Throwable t) {
