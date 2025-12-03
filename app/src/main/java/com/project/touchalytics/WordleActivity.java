@@ -86,6 +86,14 @@ public class WordleActivity extends AppCompatActivity
         statusMatchedSym = findViewById(R.id.statusMatchedSym);
         statusNotMatchedSym = findViewById(R.id.statusNotMatchedSym);
 
+        Button newGameButton = findViewById(R.id.newGameButton);
+        newGameButton.setOnClickListener(this::onNewGame);
+
+        newGameButton.setOnTouchListener((v, event) -> {
+            touchManager.handleTouchEvent(event);
+            return false;
+        });
+
         // Now initialize the touch manager
         touchManager = MainActivity.getInstance();
 
@@ -488,7 +496,7 @@ public class WordleActivity extends AppCompatActivity
             if (finalLooksValid) {
                 acceptGuess(pendingGuess);
             } else {
-                Toast.makeText(this, "That doesn't look like a real word.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "That doesn\'t look like a real word.", Toast.LENGTH_SHORT).show();
             }
             pendingGuess = null;
         });
@@ -564,7 +572,7 @@ public class WordleActivity extends AppCompatActivity
         // Not enough swipes stored on server: tell the user and send them back
         String msg = "The server reports only " + (totalCount-N1-N2) +
                 " stored training swipes, but " + N3 +
-                " are required for the Wordle training.\n\n" +
+                " are required for the Wordle training.\\n\\n" +
                 "You will need to redo this training phase.";
 
         new AlertDialog.Builder(this)

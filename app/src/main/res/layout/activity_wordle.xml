@@ -80,21 +80,31 @@
 
     <GridLayout
         android:id="@+id/boardGrid"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_width="382dp"
+        android:layout_height="540dp"
         android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/keyboard_container"
+        app:layout_constraintBottom_toTopOf="@+id/newGameButton"
         app:layout_constraintDimensionRatio="5:6"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/newGameButton"
+        android:layout_width="339dp"
+        android:layout_height="54dp"
+        android:layout_marginBottom="32dp"
+        android:text="New Game"
+        app:layout_constraintBottom_toTopOf="@+id/keyboard_container"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
     <LinearLayout
         android:id="@+id/keyboard_container"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        app:layout_constraintBottom_toTopOf="@id/statusBar"
+        app:layout_constraintBottom_toTopOf="@+id/statusBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
